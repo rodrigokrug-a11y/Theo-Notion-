@@ -4967,23 +4967,37 @@ function Breadcrumbs({ pages, activePage, onSelect }: any) {
   );
 }
 
+// Chip colorido do tipo de página (índigo=doc, âmbar=caderno, teal=diagrama)
+function pageTypeChip(p: any) {
+  if (isDiagramPage(p)) return { bg: "rgba(30,142,126,0.15)", fg: "#1E8E7E" };
+  if (isCanvasPage(p)) return { bg: "rgba(190,122,30,0.16)", fg: "#BE7A1E" };
+  return { bg: "rgba(91,69,217,0.13)", fg: "#5B45D9" };
+}
+function SbChip({ bg, fg, size = 21, children }: any) {
+  return <span style={{ background: bg, color: fg, width: size, height: size }} className="rounded-md flex items-center justify-center shrink-0 text-[12px] leading-none">{children}</span>;
+}
+function PageChip({ page, size = 21 }: any) {
+  const c = pageTypeChip(page);
+  return <SbChip bg={c.bg} fg={c.fg} size={size}>{pageIconNode(page.icon)}</SbChip>;
+}
+
 function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, onToggleFav, onDelete, onMove, onDuplicate, onReorder, onShowTrash, onShowSearch, onClose, user, canEdit, view, onMoveDialog, onGoHome, width = 256 }: any) {
   const roots = (Array.isArray(pages)?pages:[]).filter((p: any) => !p.parent_id && !p.deleted_at).sort((a: any, b: any) => a.sort_order - b.sort_order);
   const favs = (Array.isArray(pages)?pages:[]).filter((p: any) => p.is_favorite && !p.deleted_at);
-  const recentes = [...pages]
+  const recentes = [...(Array.isArray(pages)?pages:[])]
     .filter((p: any) => !p.deleted_at)
     .sort((a: any, b: any) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
-    .slice(0, 6);
+    .slice(0, 4);
   const trashCount = (Array.isArray(pages)?pages:[]).filter((p: any) => p.deleted_at).length;
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  // Seções recolhíveis: Recentes e Páginas iniciam recolhidas
-  const [secOpen, setSecOpen] = useState<{ recentes: boolean; paginas: boolean }>({ recentes: false, paginas: false });
-  const toggleSec = (k: "recentes" | "paginas") => setSecOpen((s) => ({ ...s, [k]: !s[k] }));
-  // Subpágina ativa = caminho sempre visível: a seção Páginas abre sozinha
+  // Mantém os ancestrais da página ativa sempre expandidos na árvore
   useEffect(() => {
-    const ap = (Array.isArray(pages)?pages:[]).find((p: any) => p.id === activeId);
-    if (ap && ap.parent_id) setSecOpen((s) => (s.paginas ? s : { ...s, paginas: true }));
+    const byId = new Map((Array.isArray(pages)?pages:[]).map((p: any) => [p.id, p]));
+    let cur: any = byId.get(activeId);
+    const toOpen: any = {};
+    while (cur && cur.parent_id) { toOpen[cur.parent_id] = true; cur = byId.get(cur.parent_id); }
+    if (Object.keys(toOpen).length) setExpanded((e: any) => ({ ...e, ...toOpen }));
   }, [activeId]);
 
   const handleDropOnList = (e: any, parentId: string | null) => {
@@ -5009,118 +5023,109 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
     setDropTargetId(null);
   };
 
-  const itemCls = (active: boolean) =>
-    "w-full flex items-center gap-2 px-2 h-7 rounded-md text-sm transition-colors group " +
-    (active ? "bg-accent text-foreground" : "text-foreground/75 hover:bg-accent hover:text-foreground");
+  const secLabel = "px-2 pb-1.5 text-[11px] font-bold uppercase tracking-[0.07em] text-muted-foreground/70";
+  const navItem = (active: boolean) =>
+    "w-full flex items-center gap-2.5 px-2 py-1.5 rounded-[9px] text-[13.5px] text-left transition-colors " +
+    (active ? "bg-primary/10 text-primary font-semibold" : "text-foreground/80 hover:bg-accent");
 
   return (
-    <aside className="border-r border-border flex flex-col h-full" style={{ width: width + "px", backgroundColor: "hsl(var(--muted) / 0.6)" }}>
-      {/* Header — workspace */}
-      <div className="px-3 pt-3 pb-1 flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="h-6 w-6 rounded-md flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0 bg-primary">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="text-sm font-semibold text-foreground truncate">
-            {user.name.split(" ")[0]}
-          </div>
+    <aside className="border-r border-border flex flex-col h-full" style={{ width: width + "px", backgroundColor: "hsl(var(--muted) / 0.55)" }}>
+      {/* Workspace switcher */}
+      <div className="flex items-center gap-2.5 px-3 pt-3.5 pb-2.5 shrink-0">
+        <div className="h-7 w-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-[13px] shrink-0 shadow-sm">{(user.name || "?").charAt(0).toUpperCase()}</div>
+        <div className="flex-1 min-w-0 leading-tight">
+          <div className="font-semibold text-[14px] text-foreground truncate">{(user.name || "Você").split(" ")[0]}</div>
+          <div className="text-[11px] text-muted-foreground">Espaço pessoal</div>
         </div>
-        <button onClick={onClose} className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground shrink-0" title="Recolher (⌘\\)" type="button">
-          <PanelLeftCloseIcon size={14} />
+        <button onClick={onClose} className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground shrink-0" title="Recolher (⌘\\)" type="button"><PanelLeftCloseIcon size={15} /></button>
+      </div>
+
+      {/* Busca */}
+      <div className="px-3 pb-2.5 shrink-0">
+        <button onClick={onShowSearch} className="w-full flex items-center gap-2 h-[34px] px-2.5 rounded-[10px] border border-border hover:border-muted-foreground/30 transition-colors" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+          <span className="flex-1 text-[13px] text-muted-foreground text-left">Buscar tudo</span>
+          <span className="text-[11px] font-semibold text-muted-foreground/70 bg-muted border border-border rounded px-1.5 py-px">⌘K</span>
         </button>
       </div>
 
-      {/* Quick actions */}
-      <div className="px-2 py-2 space-y-0.5 shrink-0">
-        <button onClick={onShowSearch} className="w-full flex items-center gap-2 px-2 h-7 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground transition-colors" type="button">
-          <span className="text-[13px]">🔍</span><span>Buscar</span>
-          <kbd className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-background/80 border border-border text-muted-foreground">⌘K</kbd>
+      {/* Página inicial */}
+      <div className="px-2 shrink-0">
+        <button onClick={onGoHome} className={navItem(!activeId && view === "page")} type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M3 11.4 12 4l9 7.4" /><path d="M5.6 9.7V20h12.8V9.7" /></svg>
+          <span className="flex-1">Página inicial</span>
         </button>
-        <button onClick={onGoHome} className={"w-full flex items-center gap-2 px-2 h-7 rounded-md text-sm transition-colors " + (!activeId && view === "page" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")} type="button">
-          <span className="text-[13px]">🏠</span><span>Página inicial</span>
-        </button>
-        {canEdit && (
-          <button onClick={() => onCreate(null)} className="w-full flex items-center gap-2 px-2 h-7 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground transition-colors" type="button">
-            <span className="text-[13px] font-bold leading-none">+</span><span>Nova página</span>
-            <kbd className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-background/80 border border-border text-muted-foreground">⌘N</kbd>
-          </button>
-        )}
-        {canEdit && (
-          <button onClick={() => onCreate(null, "canvas")} className="w-full flex items-center gap-2 px-2 h-7 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground transition-colors" type="button">
-            <span className="text-[13px]">✏️</span><span>Novo caderno</span>
-          </button>
-        )}
-        {canEdit && (
-          <button onClick={() => onCreate(null, "diagram")} className="w-full flex items-center gap-2 px-2 h-7 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground transition-colors" type="button">
-            <span className="text-[13px]">🗺️</span><span>Novo diagrama</span>
-          </button>
-        )}
       </div>
 
-      {/* Scrollable content */}
+      {/* Criar */}
+      {canEdit && (
+        <div className="px-2 pt-3.5 shrink-0">
+          <div className={secLabel}>Criar</div>
+          <button onClick={() => onCreate(null)} className={navItem(false) + " font-medium"} type="button">
+            <SbChip bg="rgba(91,69,217,0.13)" fg="#5B45D9"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></SbChip>
+            <span className="flex-1">Nova página</span>
+            <span className="text-[11px] font-semibold text-muted-foreground/50">⌘N</span>
+          </button>
+          <button onClick={() => onCreate(null, "canvas")} className={navItem(false) + " font-medium"} type="button">
+            <SbChip bg="rgba(190,122,30,0.16)" fg="#BE7A1E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L8 18l-4 1 1-4z" /></svg></SbChip>
+            <span className="flex-1">Novo caderno</span>
+          </button>
+          <button onClick={() => onCreate(null, "diagram")} className={navItem(false) + " font-medium"} type="button">
+            <SbChip bg="rgba(30,142,126,0.15)" fg="#1E8E7E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg></SbChip>
+            <span className="flex-1">Novo diagrama</span>
+          </button>
+        </div>
+      )}
+
+      {/* Scroll */}
       <div
-        className="flex-1 overflow-y-auto px-2 pb-12 flex flex-col gap-4"
+        className="flex-1 overflow-y-auto px-2 pt-3.5 pb-4"
         onDragOver={(e) => { e.preventDefault(); setDropTargetId("__root__"); }}
         onDrop={(e) => handleDropOnList(e, null)}
       >
         {favs.length > 0 && (
-          <div>
-            <div className="px-2 py-1 text-xs text-muted-foreground/80 mb-0.5">Favoritos</div>
-            <div className="flex flex-col gap-0.5">
-              {(Array.isArray(favs)?favs:[]).map((p: any) => (
-                <button key={p.id} onClick={() => onSelect(p.id)} className={itemCls(activeId === p.id && view === "page")} type="button">
-                  <span className="text-[13px] shrink-0">{pageIconNode(p.icon)}</span>
-                  <span className="truncate">{p.title || "Sem título"}</span>
-                </button>
-              ))}
-            </div>
+          <div className="mb-3">
+            <div className={secLabel}>Favoritos</div>
+            {(Array.isArray(favs)?favs:[]).map((p: any) => (
+              <button key={p.id} onClick={() => onSelect(p.id)} className={navItem(activeId === p.id && view === "page")} type="button">
+                <PageChip page={p} />
+                <span className="flex-1 truncate">{p.title || "Sem título"}</span>
+              </button>
+            ))}
           </div>
         )}
 
         {recentes.length > 0 && (
-          <div>
-            <button onClick={() => toggleSec("recentes")} className="w-full flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground/80 hover:text-foreground transition-colors mb-0.5" type="button">
-              <span className="w-3 text-[9px] leading-none">{secOpen.recentes ? "▼" : "▶"}</span>
-              <span>Recentes</span>
-            </button>
-            {secOpen.recentes && (
-            <div className="flex flex-col gap-0.5">
-              {(Array.isArray(recentes)?recentes:[]).map((p: any) => (
-                <button key={p.id} onClick={() => onSelect(p.id)} className={itemCls(activeId === p.id && view === "page")} type="button">
-                  <span className="text-[13px] shrink-0">{pageIconNode(p.icon)}</span>
-                  <span className="truncate">{p.title || "Sem título"}</span>
-                </button>
-              ))}
-            </div>
-            )}
+          <div className="mb-3">
+            <div className={secLabel}>Recentes</div>
+            {(Array.isArray(recentes)?recentes:[]).map((p: any) => (
+              <button key={p.id} onClick={() => onSelect(p.id)} className={navItem(activeId === p.id && view === "page")} type="button">
+                <PageChip page={p} />
+                <span className="flex-1 truncate">{p.title || "Sem título"}</span>
+              </button>
+            ))}
           </div>
         )}
 
-        <div className="flex-1">
-          <div className="px-2 py-1 text-xs text-muted-foreground/80 flex items-center justify-between mb-0.5">
-            <button onClick={() => toggleSec("paginas")} className="flex items-center gap-1 hover:text-foreground transition-colors" type="button">
-              <span className="w-3 text-[9px] leading-none">{secOpen.paginas ? "▼" : "▶"}</span>
-              <span>Páginas</span>
-            </button>
-            {canEdit && <button onClick={() => { setSecOpen((s) => ({ ...s, paginas: true })); onCreate(null); }} className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground text-base font-bold leading-none" title="Nova página raiz" type="button">+</button>}
-          </div>
-          {secOpen.paginas && (
-            <>
-              {(Array.isArray(roots)?roots:[]).map((p: any) => (
-                <PageNode key={p.id} page={p} pages={pages} level={0} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={view === "page"} onMoveDialog={onMoveDialog} />
-              ))}
-              {roots.length === 0 && (<div className="px-2 py-3 text-xs text-muted-foreground italic text-center">Nenhuma página ainda.<br />{canEdit && "Clique em + acima para criar."}</div>)}
-            </>
-          )}
-          <div className={"h-12 w-full mt-1 rounded-md transition-colors " + (dropTargetId === "__root__" ? "bg-primary/10 border border-primary/40" : "")} />
+        <div className="flex items-center justify-between pr-1">
+          <div className={secLabel + " pb-0"}>Páginas</div>
+          {canEdit && <button onClick={() => onCreate(null)} className="h-[18px] w-[18px] flex items-center justify-center rounded-[5px] text-muted-foreground/70 hover:bg-accent hover:text-foreground transition-colors" title="Nova página" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></button>}
         </div>
+        <div className="mt-1">
+          {(Array.isArray(roots)?roots:[]).map((p: any) => (
+            <PageNode key={p.id} page={p} pages={pages} level={0} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={view === "page"} onMoveDialog={onMoveDialog} />
+          ))}
+          {roots.length === 0 && (<div className="px-2 py-3 text-xs text-muted-foreground italic text-center">Nenhuma página ainda.<br />{canEdit && "Clique em + para criar."}</div>)}
+        </div>
+        <div className={"h-10 w-full mt-1 rounded-md transition-colors " + (dropTargetId === "__root__" ? "bg-primary/10 border border-primary/40" : "")} />
       </div>
 
-      {/* Lixeira */}
-      <div className="p-2 border-t border-border/40 bg-background/30 backdrop-blur-sm shrink-0">
-        <button onClick={onShowTrash} className={"w-full flex items-center gap-2 px-2 h-7 rounded-md hover:bg-accent text-sm transition-colors " + (view === "trash" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")} type="button">
-          <span className="text-[13px]">🗑️</span><span>Lixeira</span>
-          {trashCount > 0 && (<span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{trashCount}</span>)}
+      {/* Footer — Lixeira */}
+      <div className="p-2 border-t border-border shrink-0">
+        <button onClick={onShowTrash} className={navItem(view === "trash")} type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 12.5h9l1-12.5" /></svg>
+          <span className="flex-1">Lixeira</span>
+          {trashCount > 0 && (<span className="text-[11px] font-semibold text-muted-foreground bg-muted rounded-full px-1.5 py-px">{trashCount}</span>)}
         </button>
       </div>
     </aside>
@@ -5168,18 +5173,18 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
           setDragId(null);
           setDropTargetId(null);
         }}
-        className={"flex items-center h-7 px-1 rounded-md transition-colors cursor-pointer group " + (active ? "bg-accent text-foreground" : "hover:bg-accent text-foreground/75 hover:text-foreground") + " " + (dropTargetId === page.id ? "ring-2 ring-primary bg-primary/10" : "")}
+        className={"flex items-center gap-1.5 py-1.5 px-2 rounded-[9px] transition-colors cursor-pointer group " + (active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-accent text-foreground/80") + " " + (dropTargetId === page.id ? "ring-2 ring-primary bg-primary/10" : "")}
         onClick={() => onSelect(page.id)}
       >
         <button
           onClick={(e) => { e.stopPropagation(); if (hasChildren) setExpanded((x: any) => ({ ...x, [page.id]: !isOpen })); }}
-          className={"h-5 w-5 flex items-center justify-center rounded shrink-0 transition-colors text-[10px] " + (hasChildren ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-transparent group-hover:text-muted-foreground/30")}
+          className={"h-4 w-4 flex items-center justify-center shrink-0 transition-all " + (hasChildren ? "text-muted-foreground/70 hover:text-foreground " + (isOpen ? "rotate-90" : "") : "opacity-0")}
           type="button"
         >
-          {hasChildren ? (isOpen ? "▼" : "▶") : "·"}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
         </button>
-        <span className="text-[13px] shrink-0 mx-1">{pageIconNode(page.icon)}</span>
-        <span className={"flex-1 text-sm truncate " + (active ? "font-medium" : "")}>{page.title || "Sem título"}</span>
+        <PageChip page={page} size={20} />
+        <span className="flex-1 text-[13px] truncate">{page.title || "Sem título"}</span>
         {canEdit && (
           <div className="touch-show flex items-center gap-0.5 shrink-0 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
             <CustomMenu
@@ -5202,7 +5207,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
         {!canEdit && hasChildren && (<span className="text-[10px] text-muted-foreground bg-muted/70 px-1.5 rounded-md shrink-0" title={children.length + " subpágina(s)"}>{children.length}</span>)}
       </div>
       {isOpen && hasChildren && (
-        <div className="ml-3 pl-1 border-l border-border/40">
+        <div className="ml-[19px] pl-[9px] border-l border-border">
           {(Array.isArray(children)?children:[]).map((c: any) => (
             <PageNode key={c.id} page={c} pages={pages} level={level + 1} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={viewActive} onMoveDialog={onMoveDialog} />
           ))}
