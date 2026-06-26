@@ -5648,6 +5648,12 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const cur = (nodeById(ids[0]) || {}).fontSize || 15;
     setSelectedFont(cur + d);
   };
+  // Cor do texto dos nós selecionados
+  const setSelectedTextColor = (c: string) => {
+    const ids = selectedNodeIds();
+    if (!ids.length) return;
+    commit(nodesRef.current.map((n: any) => (ids.indexOf(n.id) !== -1 ? { ...n, textColor: c } : n)), edgesRef.current);
+  };
 
   const zoomBy = (factor: number) => {
     const r = svgRef.current?.getBoundingClientRect();
@@ -6251,6 +6257,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       </div>
     );
   };
+  // Linha de cores do texto (nós)
+  const textColorRow = () => {
+    const ids = selectedNodeIds();
+    const cur = String((nodeById(ids[0]) || {}).textColor || "#0f172a").toLowerCase();
+    const DOTS = ["#1b1a17", "#5b45d9", "#2f6bd8", "#1e8e7e", "#be7a1e", "#c8466b", "#dc2626", "#ffffff"];
+    return (
+      <div className="flex items-center gap-1" title="Cor do texto">
+        {DOTS.map((c) => (
+          <button key={c} onClick={() => setSelectedTextColor(c)} className={"w-[15px] h-[15px] rounded-full border transition-transform hover:scale-110 shrink-0 " + (cur === c ? "ring-2 ring-primary" : "")} style={{ backgroundColor: c, borderColor: "hsl(var(--border))" }} title={c} type="button" />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
@@ -6522,6 +6541,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
             <div className="w-px h-5 bg-border" />
             {fontStepper()}
             <div className="w-px h-5 bg-border" />
+            {textColorRow()}
+            <div className="w-px h-5 bg-border" />
             <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋 Duplicar</button>
             <div className="w-px h-5 bg-border" />
             <button onClick={deleteSelected} className={eBtn} title="Excluir selecionados (Delete)" type="button">🗑️ Excluir</button>
@@ -6535,12 +6556,18 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       {canEdit && effTool === "select" && selNode && multiSel.length <= 1 && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (!editing || (editing.id === selNode.id && !editing.edge)) && (
         <div onMouseDown={(e) => e.preventDefault()} className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5">
           {editing ? (
-            fontStepper()
+            <>
+              {fontStepper()}
+              <div className="w-px h-5 bg-border" />
+              {textColorRow()}
+            </>
           ) : (
             <>
               <button onClick={() => startEditNode(selNode)} className={eBtn} title="Editar texto (duplo clique)" type="button">✎ Texto</button>
               <div className="w-px h-5 bg-border" />
               {fontStepper()}
+              <div className="w-px h-5 bg-border" />
+              {textColorRow()}
               <div className="w-px h-5 bg-border" />
               <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋</button>
               <button onClick={deleteSelected} className={eBtn} title="Excluir (Delete)" type="button">🗑️</button>
@@ -8390,6 +8417,13 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
       {/* Ações da seleção */}
       {canEdit && (tool === "select" || tool === "text" || tool === "shape") && (selectedId || (multiSel && multiSel.length > 1)) && !textEdit && (
         <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5 animate-fade-in max-w-[94vw] overflow-x-auto" style={pillStyle}>
+          <div className="flex items-center gap-1 pl-1 pr-0.5 shrink-0" title="Cor">
+            {["#1e293b", "#ffffff", "#ef4444", "#f97316", "#eab308", "#16a34a", "#0ea5e9", "#6366f1"].map((c) => (
+              <button key={c} onClick={() => recolorSelected(c)} className="w-5 h-5 rounded-full border border-border/60 hover:scale-110 transition-transform shrink-0" style={{ backgroundColor: c }} title={c} type="button" />
+            ))}
+            <label className="w-6 h-6 flex items-center justify-center rounded-md cursor-pointer hover:bg-accent relative shrink-0 text-[12px]" title="Cor personalizada">🎨<input type="color" onChange={(e) => recolorSelected(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" /></label>
+          </div>
+          <div className="w-px h-5 bg-border" />
           {multiSel && multiSel.length > 1 ? (
             <>
               <button onClick={groupSelected} className="h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-semibold text-primary hover:bg-accent transition-colors" title="Agrupar os selecionados (movem juntos)" type="button">⧉ Agrupar ({multiSel.length})</button>
