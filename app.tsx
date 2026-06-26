@@ -62,6 +62,73 @@ const SLASH_ITEMS = [
 
 const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😕 🙁 😣 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🤭 🤫 🤥 😶 😐 😑 😬 🙄 😯 😲 🥱 😴 🤤 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👻 💀 👽 👾 🤖 🎃 🤲 👐 🙌 👏 🤝 👍 👎 👊 ✊ 👌 ✋ 👋 🤙 💪 🦾 🙏 👁 👀 🧠 🗣 👤 👥 👶 👧 🧒 👦 👩 🧑 👨 👵 🧓 👴 🧕 👮 👷 💂 🕵 👰 🤵 👸 🤴 🦸 🦹 🧙 🧝 🧛 🧟 🧞 🧜 🧚 👼 🤰 💃 🕺 🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🐣 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🐘 🦏 🐪 🦒 🐃 🐂 🐄 🐎 🐖 🐑 🦙 🐐 🦌 🐕 🐈 🐓 🦃 🦚 🦜 🐇 🐉 🐲 🌵 🎄 🌲 🌳 🌴 🌱 🌿 🍀 🍃 🍂 🍁 🍄 🌾 💐 🌷 🌹 🌺 🌸 🌼 🌻 🌞 🌝 🌜 🌙 🌎 🌍 🌏 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☀️ ☁️ ❄️ ☃️ ⛄ 💨 💧 💦 🌊 🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥒 🌶 🌽 🥕 🥔 🍠 🥐 🍞 🥖 🥨 🧀 🥚 🍳 🥞 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🥪 🌮 🌯 🥗 🍝 🍜 🍲 🍛 🍣 🍱 🍤 🍙 🍚 🍘 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 🌰 🍯 🥛 🍼 ☕ 🍵 🥤 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🍾 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🏉 🎱 🏓 🏸 🥅 ⛳ 🏹 🎣 🥊 🥋 🛹 🎿 ⛷ 🏂 🏆 🥇 🥈 🥉 🏅 🎖 🎫 🎟 🎪 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎲 🎯 🎳 🎮 🚗 🚕 🚙 🚌 🚎 🏎 🚓 🚑 🚒 🚐 🚚 🚛 🚜 🛵 🏍 🚨 🚔 🚍 🚘 🚖 🚲 🛴 🚀 🛸 🚁 ✈️ 🚂 🚆 🚇 🚊 🚉 🛳 ⛵ 🚢 ⚓ 🚧 🚦 🗺 🗽 🏰 🏯 🏟 🎡 🎢 🎠 🏖 🏝 🏜 🌋 🏔 🗻 🏕 🏠 🏡 🏘 🏗 🏭 🏢 🏬 🏥 🏦 🏨 🏪 🏫 🏩 🏛 ⛪ 🕌 🕍 🌅 🌄 🌠 🌇 🌆 🏙 🌃 🌌 🌉 🌁 ⌚ 📱 💻 🖥 🖨 🖱 💾 💿 📷 📹 🎥 📞 ☎ 📺 📻 🔋 🔌 💡 🔦 🕯 💵 💴 💶 💷 💰 💳 💎 🔧 🔨 🛠 🔩 ⚙ 🧱 🔫 💣 🔪 🛡 🔮 📿 🔬 🔭 🩺 💊 💉 🧬 🧪 🌡 🧹 🚽 🚿 🛁 🧼 🛎 🔑 🚪 🛏 🛋 🧸 🛍 🛒 🎁 🎈 🎀 🎊 🎉 🎎 🏮 🧧 ✉ 📩 📨 📧 📥 📤 📦 📪 📫 📬 📮 📯 📜 📄 📑 🧾 📊 📈 📉 🗒 🗓 📆 📅 🗑 📁 📂 🗂 🗞 📰 📓 📔 📒 📕 📗 📘 📙 📚 📖 🔖 📎 📐 📏 📌 📍 ✂ 🖊 🖋 🖌 🖍 📝 ✏ 🔍 🔎 🔏 🔐 🔒 🔓".split(" ");
 
+// ========================================================================
+// Ícones planos (Flaticon UIcons) — base alternativa aos emojis para páginas
+// ========================================================================
+const isUicon = (s: any) => typeof s === "string" && s.indexOf("fi-") === 0;
+function pageIconNode(icon: any) {
+  if (isUicon(icon)) return <i className={"fi " + icon} style={{ fontStyle: "normal", lineHeight: 1, display: "inline-block" }} />;
+  return icon;
+}
+const UICON_CSS = [
+  "https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css",
+  "https://cdn-uicons.flaticon.com/2.6.0/uicons-bold-rounded/css/uicons-bold-rounded.css",
+  "https://cdn-uicons.flaticon.com/2.6.0/uicons-solid-rounded/css/uicons-solid-rounded.css",
+  "https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-straight/css/uicons-regular-straight.css",
+  "https://cdn-uicons.flaticon.com/2.6.0/uicons-solid-straight/css/uicons-solid-straight.css",
+  "https://cdn-uicons.flaticon.com/2.6.0/uicons-brands/css/uicons-brands.css",
+];
+let uiconsLinked = false;
+function linkUicons() {
+  if (uiconsLinked || typeof document === "undefined") return;
+  uiconsLinked = true;
+  for (const href of UICON_CSS) {
+    if (document.querySelector('link[data-uicon="1"][href="' + href + '"]')) continue;
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = href; l.setAttribute("data-uicon", "1");
+    document.head.appendChild(l);
+  }
+}
+const UICON_FALLBACK = "fi-rr-home fi-rr-apps fi-rr-user fi-rr-users fi-rr-settings fi-rr-settings-sliders fi-rr-search fi-rr-heart fi-rr-star fi-rr-bookmark fi-rr-calendar fi-rr-clock fi-rr-bell fi-rr-envelope fi-rr-paper-plane fi-rr-comment fi-rr-comments fi-rr-phone-call fi-rr-camera fi-rr-picture fi-rr-video-camera fi-rr-music fi-rr-play fi-rr-pause fi-rr-stop fi-rr-folder fi-rr-folder-open fi-rr-document fi-rr-file fi-rr-copy fi-rr-trash fi-rr-edit fi-rr-pencil fi-rr-plus fi-rr-minus fi-rr-cross fi-rr-check fi-rr-menu-burger fi-rr-list fi-rr-grid fi-rr-filter fi-rr-refresh fi-rr-download fi-rr-upload fi-rr-cloud fi-rr-link fi-rr-share fi-rr-lock fi-rr-unlock fi-rr-key fi-rr-shield fi-rr-eye fi-rr-eye-crossed fi-rr-bulb fi-rr-flame fi-rr-bolt fi-rr-world fi-rr-marker fi-rr-map fi-rr-compass fi-rr-car fi-rr-plane fi-rr-rocket fi-rr-gift fi-rr-shopping-cart fi-rr-shopping-bag fi-rr-credit-card fi-rr-wallet fi-rr-coins fi-rr-stats fi-rr-dashboard fi-rr-briefcase fi-rr-building fi-rr-graduation-cap fi-rr-book fi-rr-book-alt fi-rr-pen-clip fi-rr-palette fi-rr-brush fi-rr-magic-wand fi-rr-crown fi-rr-trophy fi-rr-flag fi-rr-tags fi-rr-megaphone fi-rr-target fi-rr-thumbs-up fi-rr-thumbs-down fi-rr-smile fi-rr-sad fi-rr-angry fi-rr-arrow-up fi-rr-arrow-down fi-rr-arrow-left fi-rr-arrow-right fi-rr-angle-up fi-rr-angle-down fi-rr-angle-left fi-rr-angle-right fi-rr-info fi-rr-exclamation fi-rr-interrogation fi-rr-bug fi-rr-database fi-rr-server fi-rr-laptop fi-rr-mobile fi-rr-desktop fi-rr-keyboard fi-rr-print fi-rr-wifi fi-rr-battery-full fi-rr-plug fi-rr-microphone fi-rr-headphones fi-rr-volume fi-rr-sun fi-rr-moon fi-rr-snowflake fi-rr-umbrella fi-rr-coffee fi-rr-restaurant fi-rr-leaf fi-rr-tree fi-rr-paw fi-rr-dumbbell fi-rr-bicycle fi-rr-clipboard fi-rr-archive fi-rr-inbox fi-rr-paperclip fi-rr-thumbtack fi-rr-hourglass fi-rr-id-badge fi-rr-sign-out fi-rr-sign-in fi-rr-bank fi-rr-chart-pie fi-rr-chart-histogram fi-rr-receipt fi-rr-box fi-rr-boxes fi-rr-shipping-fast".split(" ");
+let uiconNamesPromise: Promise<string[]> | null = null;
+function loadUiconNames(): Promise<string[]> {
+  if (uiconNamesPromise) return uiconNamesPromise;
+  uiconNamesPromise = (async () => {
+    const set = new Set<string>();
+    // 1) varre as folhas já carregadas (funciona se o CDN permitir CORS)
+    try {
+      for (const sh of Array.from(document.styleSheets) as any[]) {
+        let rules: any = null;
+        try { rules = sh.cssRules; } catch (e) { rules = null; }
+        if (!rules) continue;
+        for (const r of Array.from(rules) as any[]) {
+          const sel = r && r.selectorText;
+          if (!sel || sel.indexOf(".fi-") === -1) continue;
+          const mm = sel.match(/\.fi-[a-z0-9-]+/gi);
+          if (mm) for (const c of mm) set.add(c.slice(1));
+        }
+      }
+    } catch (e) {}
+    // 2) baixa o CSS para obter a lista completa de cada conjunto
+    if (set.size < 120) {
+      for (const href of UICON_CSS) {
+        try {
+          const res = await fetch(href);
+          if (!res.ok) continue;
+          const txt = await res.text();
+          const mm = txt.match(/\.fi-[a-z0-9-]+:{1,2}before/gi);
+          if (mm) for (const c of mm) set.add(c.replace(/:{1,2}before/i, "").slice(1));
+        } catch (e) {}
+      }
+    }
+    if (set.size === 0) UICON_FALLBACK.forEach((n) => set.add(n));
+    const arr = Array.from(set).sort();
+    if (arr.length < 120) uiconNamesPromise = null; // permite nova tentativa após a fonte carregar
+    return arr;
+  })();
+  return uiconNamesPromise;
+}
+
 const TEXT_COLORS = [
   { n: "Padrão", fg: "inherit" },
   { n: "Cinza", fg: "#9ca3af" },
@@ -792,6 +859,8 @@ function AppContent({ db, user, files }: any) {
     return { ...r, content };
   });
 
+  useEffect(() => { linkUicons(); }, []);
+
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
@@ -1026,7 +1095,7 @@ function AppContent({ db, user, files }: any) {
           triggerCls="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors text-base font-bold leading-none pb-1"
           triggerContent={<span style={{ letterSpacing: "1px" }}>•••</span>}
           items={[
-            { label: "Alterar ícone", icon: <span className="text-base">{activePage.icon}</span>, onClick: () => setShowIconPicker(true) },
+            { label: "Alterar ícone", icon: <span className="text-base">{pageIconNode(activePage.icon)}</span>, onClick: () => setShowIconPicker(true) },
             ...(!isCanvasPage(activePage) && !isDiagramPage(activePage) ? [
               { label: activePage.cover_url ? "Trocar capa/cor" : "Adicionar capa/cor", icon: <span className="text-sm">🖼️</span>, onClick: () => setShowCoverPicker(true) },
               ...(activePage.cover_url ? [{ label: "Remover capa", icon: <span className="text-sm">🚫</span>, onClick: () => queueSave(activePage.id, { cover_url: null }) }] : []),
@@ -1208,7 +1277,7 @@ function MoveDialog({ page, pages, onClose, onMove }: any) {
             style={{ paddingLeft: 8 + level * 16, paddingRight: 8 }}
             type="button"
           >
-            <span className="text-base shrink-0">{p.icon}</span>
+            <span className="text-base shrink-0">{pageIconNode(p.icon)}</span>
             <span className="truncate flex-1 text-foreground">{p.title || "Sem título"}</span>
             {p.id === page.parent_id && <span className="text-[10px] text-muted-foreground shrink-0">atual</span>}
           </button>
@@ -1262,7 +1331,7 @@ function Breadcrumbs({ pages, activePage, onSelect }: any) {
         <span key={p.id} className="flex items-center min-w-0">
           {i > 0 && <span className="text-muted-foreground/50 shrink-0 mx-0.5">/</span>}
           <button onClick={() => onSelect(p.id)} className={"flex items-center gap-1 hover:bg-accent rounded-md px-1.5 py-1 transition-colors min-w-0 " + (i === path.length - 1 ? "text-foreground" : "text-muted-foreground hover:text-foreground")} type="button">
-            <span className="shrink-0 text-sm">{p.icon}</span>
+            <span className="shrink-0 text-sm">{pageIconNode(p.icon)}</span>
             <span className={"truncate text-sm " + (i === path.length - 1 ? "font-medium" : "")}>{p.title || "Sem título"}</span>
           </button>
         </span>
@@ -1373,7 +1442,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
             <div className="flex flex-col gap-0.5">
               {(Array.isArray(favs)?favs:[]).map((p: any) => (
                 <button key={p.id} onClick={() => onSelect(p.id)} className={itemCls(activeId === p.id && view === "page")} type="button">
-                  <span className="text-[13px] shrink-0">{p.icon}</span>
+                  <span className="text-[13px] shrink-0">{pageIconNode(p.icon)}</span>
                   <span className="truncate">{p.title || "Sem título"}</span>
                 </button>
               ))}
@@ -1391,7 +1460,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
             <div className="flex flex-col gap-0.5">
               {(Array.isArray(recentes)?recentes:[]).map((p: any) => (
                 <button key={p.id} onClick={() => onSelect(p.id)} className={itemCls(activeId === p.id && view === "page")} type="button">
-                  <span className="text-[13px] shrink-0">{p.icon}</span>
+                  <span className="text-[13px] shrink-0">{pageIconNode(p.icon)}</span>
                   <span className="truncate">{p.title || "Sem título"}</span>
                 </button>
               ))}
@@ -1482,7 +1551,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
         >
           {hasChildren ? (isOpen ? "▼" : "▶") : "·"}
         </button>
-        <span className="text-[13px] shrink-0 mx-1">{page.icon}</span>
+        <span className="text-[13px] shrink-0 mx-1">{pageIconNode(page.icon)}</span>
         <span className={"flex-1 text-sm truncate " + (active ? "font-medium" : "")}>{page.title || "Sem título"}</span>
         {canEdit && (
           <div className="touch-show flex items-center gap-0.5 shrink-0 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -1554,7 +1623,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
       ) : null}
       <div className="max-w-3xl mx-auto px-4 sm:px-12 min-h-[600px]">
         <div className={(hasCover ? "-mt-10" : "pt-10") + " relative flex items-end gap-3 mb-2"}>
-          <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-7xl select-none transition-transform leading-none " + (canEdit ? "hover:scale-110 cursor-pointer" : "")} disabled={!canEdit} type="button" style={{ filter: "drop-shadow(0 4px 6px rgb(0 0 0 / 0.1))" }}>{page.icon}</button>
+          <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-7xl select-none transition-transform leading-none " + (canEdit ? "hover:scale-110 cursor-pointer" : "")} disabled={!canEdit} type="button" style={{ filter: "drop-shadow(0 4px 6px rgb(0 0 0 / 0.1))" }}>{pageIconNode(page.icon)}</button>
         </div>
         {canEdit && !hasCover && (
           <div className="flex items-center gap-3 mb-3">
@@ -1585,7 +1654,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {(Array.isArray(subs)?subs:[]).map((s: any) => (
                 <button key={s.id} onClick={() => onSelectPage(s.id)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-border hover:bg-accent transition-colors text-left shadow-sm group" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
-                  <span className="text-base">{s.icon}</span>
+                  <span className="text-base">{pageIconNode(s.icon)}</span>
                   <span className="text-sm text-foreground truncate flex-1">{s.title || "Sem título"}</span>
                   <span className="text-muted-foreground opacity-0 group-hover:opacity-100 text-xs">›</span>
                 </button>
@@ -2323,7 +2392,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       {/* Barra superior: nome do diagrama, navegação e ações */}
       <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1">
         {headerLeft}
-        <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{page.icon}</button>
+        <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{pageIconNode(page.icon)}</button>
         <input
           value={title}
           onChange={(e) => { setTitle(e.target.value); onUpdate({ title: e.target.value }); }}
@@ -4085,7 +4154,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
       {/* Barra superior */}
       <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1" style={pillStyle}>
         {headerLeft}
-        <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{page.icon}</button>
+        <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{pageIconNode(page.icon)}</button>
         <input
           value={title}
           onChange={(e) => { setTitle(e.target.value); onUpdate({ title: e.target.value }); }}
@@ -4277,28 +4346,68 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
 }
 
 function IconPicker({ onClose, onPick }: any) {
+  const [tab, setTab] = useState<"icons" | "emoji">("icons");
   const [search, setSearch] = useState("");
-  const filtered = useMemo(() => EMOJIS, [search]);
+  const [names, setNames] = useState<string[]>([]);
+  const [loadingIcons, setLoadingIcons] = useState(false);
+
+  useEffect(() => {
+    if (tab !== "icons") return;
+    linkUicons();
+    let alive = true;
+    setLoadingIcons(true);
+    loadUiconNames().then((n) => { if (alive) { setNames(n); setLoadingIcons(false); } }).catch(() => { if (alive) setLoadingIcons(false); });
+    return () => { alive = false; };
+  }, [tab]);
+
+  const q = search.trim().toLowerCase();
+  const filteredIcons = q ? names.filter((n) => n.indexOf(q) !== -1) : names;
+  const shownIcons = filteredIcons.slice(0, 900);
+  const filteredEmojis = EMOJIS; // emojis não têm nome p/ busca
+
+  const tabBtn = (active: boolean) => "h-8 px-3 rounded-md text-sm font-medium transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent");
 
   return (
-    <CustomDialog open={true} onClose={onClose} title="Escolher ícone">
-      <div className="mb-3">
-        <input
-          autoFocus
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar ícone (simulado)..."
-          className="w-full h-9 px-3 rounded-md border-2 border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
+    <CustomDialog open={true} onClose={onClose} title="Escolher ícone" maxWidth="max-w-lg">
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={() => setTab("icons")} className={tabBtn(tab === "icons")} type="button">🎯 Ícones</button>
+        <button onClick={() => setTab("emoji")} className={tabBtn(tab === "emoji")} type="button">😀 Emoji</button>
+        {tab === "icons" && (
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar ícone (ex.: home, user, calendar)..."
+            className="flex-1 h-8 px-3 rounded-md border-2 border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        )}
       </div>
-      <div className="grid grid-cols-8 sm:grid-cols-10 gap-1 max-h-64 overflow-y-auto p-1">
-        {(Array.isArray(filtered)?filtered:[]).map((e) => (
-          <button key={e} onClick={() => onPick(e)} className="h-9 w-9 flex items-center justify-center text-xl rounded-md hover:bg-accent transition-colors hover:scale-110" type="button">
-            {e}
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 pt-3 border-t-2 border-border flex justify-end">
+
+      {tab === "icons" ? (
+        <>
+          <div className="grid grid-cols-8 sm:grid-cols-10 gap-1 max-h-72 overflow-y-auto p-1">
+            {(Array.isArray(shownIcons) ? shownIcons : []).map((n) => (
+              <button key={n} onClick={() => onPick(n)} title={n.replace(/^fi-[a-z]+-/, "").replace(/-/g, " ")} className="h-9 w-9 flex items-center justify-center text-lg rounded-md hover:bg-accent text-foreground transition-colors hover:scale-110" type="button">
+                <i className={"fi " + n} style={{ fontStyle: "normal", lineHeight: 1 }} />
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            {loadingIcons ? "Carregando ícones…" : (filteredIcons.length + " ícones" + (filteredIcons.length > shownIcons.length ? " — refine a busca para ver mais" : ""))}
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-8 sm:grid-cols-10 gap-1 max-h-72 overflow-y-auto p-1">
+          {(Array.isArray(filteredEmojis) ? filteredEmojis : []).map((e) => (
+            <button key={e} onClick={() => onPick(e)} className="h-9 w-9 flex items-center justify-center text-xl rounded-md hover:bg-accent transition-colors hover:scale-110" type="button">
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 pt-3 border-t-2 border-border flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">Ícones por Flaticon UIcons</span>
         <button onClick={() => onPick("📄")} className="h-8 px-3 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent" type="button">
           Restaurar padrão
         </button>
@@ -4669,7 +4778,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           el.className = "inline-flex items-center gap-1 text-primary font-semibold px-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer select-none transition-colors mx-1";
           el.dataset.pageId = page.id;
           el.contentEditable = "false";
-          el.innerHTML = `<span class="text-xs pointer-events-none">${page.icon}</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">${page.title || "Sem título"}</span>`;
+          const icoHtml = isUicon(page.icon) ? '<i class="fi ' + page.icon + '" style="font-style:normal"></i>' : (page.icon || "📄");
+          el.innerHTML = `<span class="text-xs pointer-events-none">${icoHtml}</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">${page.title || "Sem título"}</span>`;
           range.insertNode(el);
 
           const space = document.createTextNode(" ");
@@ -5066,7 +5176,7 @@ function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPa
             <div className="max-h-44 overflow-y-auto flex flex-col gap-1">
               {(Array.isArray(list) ? list : []).map((p: any) => (
                 <button key={p.id} onClick={() => onUpdate({ pageId: p.id })} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:bg-accent transition-colors text-left text-sm" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
-                  <span className="text-base shrink-0">{p.icon}</span>
+                  <span className="text-base shrink-0">{pageIconNode(p.icon)}</span>
                   <span className="truncate flex-1 text-foreground">{p.title || "Sem título"}</span>
                 </button>
               ))}
@@ -5080,7 +5190,7 @@ function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPa
   return (
     <div className="my-2 rounded-xl border-2 border-border overflow-hidden shadow-sm group/embed" style={{ backgroundColor: "hsl(var(--card))" }}>
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/40">
-        <span className="text-sm shrink-0">{page.icon}</span>
+        <span className="text-sm shrink-0">{pageIconNode(page.icon)}</span>
         <span className="text-sm font-medium text-foreground truncate flex-1">{page.title || "Sem título"}</span>
         <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{refKind === "diagram" ? "🗺️ Diagrama" : "🎨 Caderno"}</span>
         <button onClick={() => onSelectPage(page.id)} className="shrink-0 text-xs font-semibold text-primary hover:underline" type="button">Abrir ›</button>
@@ -5687,7 +5797,7 @@ function MentionMenu({ triggerRect, query, pages, onSelect, onClose }: any) {
       <div className="max-h-72 overflow-y-auto p-1">
         {(Array.isArray(filtered)?filtered:[]).map((it: any, i: number) => (
           <button key={it.id} onClick={() => onSelect(it)} onMouseEnter={() => setActive(i)} className={"w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent")} type="button">
-            <span className="text-base shrink-0">{it.icon}</span>
+            <span className="text-base shrink-0">{pageIconNode(it.icon)}</span>
             <span className="text-sm text-foreground truncate flex-1">{it.title || "Sem título"}</span>
           </button>
         ))}
@@ -5786,7 +5896,7 @@ function CommandPalette({ pages, onClose, onSelect }: any) {
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">{q ? "Nenhum resultado" : "Comece a digitar para buscar"}</div>
           ) : (Array.isArray(matches)?matches:[]).map((m: any, i: number) => (
             <button key={m.p.id} onClick={() => onSelect(m.p.id)} onMouseEnter={() => setActive(i)} className={"w-full flex items-start gap-3 px-2 py-2 rounded-md text-left transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent/60")} type="button">
-              <span className="text-base shrink-0">{m.p.icon}</span>
+              <span className="text-base shrink-0">{pageIconNode(m.p.icon)}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-foreground truncate">{m.p.title || "Sem título"}</div>
                 {m.hit && m.score < 10 && (<div className="text-xs text-muted-foreground truncate">{m.hit}</div>)}
@@ -5820,7 +5930,7 @@ function TrashView({ pages, onRestore, onHardDelete, onEmpty }: any) {
         <div className="rounded-xl border-2 border-border overflow-hidden divide-y divide-border" style={{ backgroundColor: "hsl(var(--card))" }}>
           {(Array.isArray(trashed)?trashed:[]).map((p: any) => (
             <div key={p.id} className="flex items-center gap-3 p-3 hover:bg-accent/30 transition-colors">
-              <span className="text-lg">{p.icon}</span>
+              <span className="text-lg">{pageIconNode(p.icon)}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-foreground truncate">{p.title || "Sem título"}</div>
                 <div className="text-xs text-muted-foreground">Excluída em {new Date(p.deleted_at).toLocaleDateString("pt-BR")}</div>
