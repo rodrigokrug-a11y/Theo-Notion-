@@ -2,34 +2,41 @@ export default function MyApp(props: any) {
   return (
     <BeaUI.ToastProvider>
       <style>{`
-        /* Paleta do Notion: tinta #37352F, cinzas quentes, azul #2383E2 */
-        :root, .dark { --primary: 210 77% 51%; --primary-foreground: 0 0% 100%; --ring: 210 77% 51%; --destructive: 220 9% 46%; --destructive-foreground: 0 0% 100%; }
+        @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Caveat:wght@500;600;700&display=swap');
+        /* Redesign "papel quente": fundo #FBFAF6, tinta #1B1A17, acento índigo #5B45D9 */
+        :root, .dark { --primary: 249 66% 56%; --primary-foreground: 0 0% 100%; --ring: 249 66% 56%; --destructive: 343 53% 53%; --destructive-foreground: 0 0% 100%; }
         :root {
-          --background: 0 0% 100%; --foreground: 45 8% 20%;
-          --card: 0 0% 100%; --card-foreground: 45 8% 20%;
-          --popover: 0 0% 100%; --popover-foreground: 45 8% 20%;
-          --muted: 60 11% 96%; --muted-foreground: 45 3% 46%;
-          --accent: 60 6% 94%; --accent-foreground: 45 8% 20%;
-          --secondary: 60 7% 94%; --secondary-foreground: 45 8% 20%;
-          --border: 60 4% 91%; --input: 60 4% 91%;
+          --background: 48 33% 97%; --foreground: 45 9% 11%;
+          --card: 0 0% 100%; --card-foreground: 45 9% 11%;
+          --popover: 0 0% 100%; --popover-foreground: 45 9% 11%;
+          --muted: 44 27% 92%; --muted-foreground: 40 8% 49%;
+          --accent: 45 22% 92%; --accent-foreground: 42 13% 22%;
+          --secondary: 44 26% 93%; --secondary-foreground: 42 13% 22%;
+          --border: 42 22% 88%; --input: 42 22% 88%;
         }
         .dark {
-          --background: 0 0% 10%; --foreground: 0 0% 83%;
-          --card: 0 0% 15%; --card-foreground: 0 0% 83%;
-          --popover: 0 0% 15%; --popover-foreground: 0 0% 83%;
-          --muted: 0 0% 13%; --muted-foreground: 0 0% 61%;
-          --accent: 0 0% 17%; --accent-foreground: 0 0% 83%;
-          --secondary: 0 0% 17%; --secondary-foreground: 0 0% 83%;
-          --border: 0 0% 22%; --input: 0 0% 22%;
-          --primary: 210 77% 58%; --ring: 210 77% 58%;
+          --background: 40 8% 9%; --foreground: 45 14% 87%;
+          --card: 40 7% 13%; --card-foreground: 45 14% 87%;
+          --popover: 40 7% 13%; --popover-foreground: 45 14% 87%;
+          --muted: 40 6% 16%; --muted-foreground: 42 9% 60%;
+          --accent: 40 6% 19%; --accent-foreground: 45 14% 87%;
+          --secondary: 40 6% 19%; --secondary-foreground: 45 14% 87%;
+          --border: 40 6% 22%; --input: 40 6% 22%;
+          --primary: 249 72% 68%; --ring: 249 72% 68%;
         }
         [style*="hsl(var(--card))"], .bg-card, .bg-popover { background-color: rgb(255 255 255) !important; }
-        .dark [style*="hsl(var(--card))"], .dark .bg-card, .dark .bg-popover { background-color: rgb(37 37 37) !important; }
+        .dark [style*="hsl(var(--card))"], .dark .bg-card, .dark .bg-popover { background-color: rgb(34 32 28) !important; }
         .canvas-pill { background-color: rgb(255 255 255 / 0.97) !important; }
-        .dark .canvas-pill { background-color: rgb(37 37 37 / 0.97) !important; }
+        .dark .canvas-pill { background-color: rgb(34 32 28 / 0.97) !important; }
         @media (hover: none) and (pointer: coarse) { .touch-show { opacity: 1 !important; } }
-        body, button, input, textarea, select { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
-        body { overscroll-behavior-y: none; background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
+        body, button, input, textarea, select { font-family: 'Hanken Grotesk', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+        body { overscroll-behavior-y: none; background-color: hsl(var(--background)); color: hsl(var(--foreground)); -webkit-font-smoothing: antialiased; }
+        /* Títulos com serifa elegante (Newsreader) */
+        .dc-serif { font-family: 'Newsreader', Georgia, 'Times New Roman', serif !important; letter-spacing: -0.01em; }
+        .dc-hand { font-family: 'Caveat', ui-rounded, cursive; }
+        *::-webkit-scrollbar { width: 11px; height: 11px; }
+        *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+        *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
       `}</style>
       <AppContent {...props} />
     </BeaUI.ToastProvider>
@@ -4839,7 +4846,7 @@ function AppContent({ db, user, files }: any) {
             <div className="h-full flex items-center justify-center p-6">
               <div className="text-center max-w-md">
                 <div className="text-7xl mb-6 inline-block">📝</div>
-                <h2 className="text-3xl font-bold text-foreground mb-3">Bem-vindo, {user.name.split(" ")[0]}</h2>
+                <h2 className="dc-serif text-4xl font-semibold text-foreground mb-3">Bem-vindo, {user.name.split(" ")[0]}</h2>
                 <p className="text-muted-foreground mb-8">Crie sua primeira página para começar a organizar suas ideias.</p>
                 {canEdit && (
                   <div className="flex items-center justify-center gap-3 flex-wrap">
@@ -5007,7 +5014,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
     (active ? "bg-accent text-foreground" : "text-foreground/75 hover:bg-accent hover:text-foreground");
 
   return (
-    <aside className="border-r border-border/50 flex flex-col h-full" style={{ width: width + "px", backgroundColor: "hsl(var(--muted) / 0.35)" }}>
+    <aside className="border-r border-border flex flex-col h-full" style={{ width: width + "px", backgroundColor: "hsl(var(--muted) / 0.6)" }}>
       {/* Header — workspace */}
       <div className="px-3 pt-3 pb-1 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -5245,7 +5252,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
       ) : null}
       <div className="max-w-3xl mx-auto px-4 sm:px-12 min-h-[600px]">
         <div className={(hasCover ? "-mt-10" : "pt-10") + " relative flex items-end gap-3 mb-2"}>
-          <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-7xl select-none transition-transform leading-none " + (canEdit ? "hover:scale-110 cursor-pointer" : "")} disabled={!canEdit} type="button" style={{ filter: "drop-shadow(0 4px 6px rgb(0 0 0 / 0.1))" }}>{pageIconNode(page.icon)}</button>
+          <button onClick={() => canEdit && setShowIconPicker(true)} className={"h-[72px] w-[72px] rounded-[20px] flex items-center justify-center text-5xl leading-none bg-primary/10 text-primary border-[3px] border-background shadow-[0_6px_16px_-6px_rgba(91,69,217,0.4)] select-none transition-transform " + (canEdit ? "hover:scale-105 cursor-pointer" : "")} disabled={!canEdit} type="button">{pageIconNode(page.icon)}</button>
         </div>
         {canEdit && !hasCover && (
           <div className="flex items-center gap-3 mb-3">
@@ -5260,14 +5267,14 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           placeholder="Sem título"
           rows={1}
           disabled={!canEdit}
-          className="w-full bg-transparent font-bold outline-none resize-none border-0 p-0 mb-4 block text-foreground placeholder:text-muted-foreground/50"
-          style={{ fontSize: "44px", lineHeight: "1.2", minHeight: "60px", fontFamily: "inherit" }}
+          className="dc-serif w-full bg-transparent font-semibold outline-none resize-none border-0 p-0 mb-4 block text-foreground placeholder:text-muted-foreground/40"
+          style={{ fontSize: "46px", lineHeight: "1.08", minHeight: "58px" }}
         />
         <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
 
         <div className="mt-12 pt-5 border-t border-border/60">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2"><span>📁</span>Subpáginas {subs.length > 0 && <span className="text-xs text-muted-foreground font-normal">({subs.length})</span>}</h3>
+            <h3 className="dc-serif text-xl font-semibold text-foreground inline-flex items-center gap-2"><span>📁</span>Subpáginas {subs.length > 0 && <span className="text-xs text-muted-foreground font-normal bg-muted rounded-full px-2 py-0.5">{subs.length}</span>}</h3>
             {canEdit && <button onClick={onCreateSubpage} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 hover:bg-accent px-2 py-1 rounded-md transition-colors" type="button"><span className="text-base font-bold leading-none">+</span>Nova subpágina</button>}
           </div>
           {subs.length === 0 ? (
@@ -5275,10 +5282,10 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {(Array.isArray(subs)?subs:[]).map((s: any) => (
-                <button key={s.id} onClick={() => onSelectPage(s.id)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-border hover:bg-accent transition-colors text-left shadow-sm group" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
-                  <span className="text-base">{pageIconNode(s.icon)}</span>
-                  <span className="text-sm text-foreground truncate flex-1">{s.title || "Sem título"}</span>
-                  <span className="text-muted-foreground opacity-0 group-hover:opacity-100 text-xs">›</span>
+                <button key={s.id} onClick={() => onSelectPage(s.id)} className="group w-full flex items-center gap-3 p-3 rounded-2xl border border-border hover:border-primary transition-all text-left hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-14px_rgba(91,69,217,0.45)]" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
+                  <span className="h-9 w-9 rounded-xl bg-accent flex items-center justify-center text-base text-foreground shrink-0 transition-colors group-hover:bg-primary/10 group-hover:text-primary">{pageIconNode(s.icon)}</span>
+                  <span className="text-sm font-medium text-foreground truncate flex-1">{s.title || "Sem título"}</span>
+                  <svg className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
                 </button>
               ))}
             </div>
@@ -5287,7 +5294,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
 
         {backlinks.length > 0 && (
           <div className="mt-8 pt-5 border-t border-border/60">
-            <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2 mb-3"><span>🔗</span>Referências <span className="text-xs text-muted-foreground font-normal">({backlinks.length})</span></h3>
+            <h3 className="dc-serif text-xl font-semibold text-foreground inline-flex items-center gap-2 mb-3"><span>🔗</span>Referências <span className="text-xs text-muted-foreground font-normal bg-muted rounded-full px-2 py-0.5">{backlinks.length}</span></h3>
             <div className="space-y-1">
               {(Array.isArray(backlinks)?backlinks:[]).map((p: any) => (
                 <button key={p.id} onClick={() => onSelectPage(p.id)} className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md hover:bg-accent transition-colors group" type="button">
@@ -6366,7 +6373,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           onChange={(e) => { setTitle(e.target.value); onUpdate({ title: e.target.value }); }}
           placeholder="Sem título"
           disabled={!canEdit}
-          className="bg-transparent outline-none text-sm font-semibold text-foreground flex-1 min-w-[4rem] placeholder:text-muted-foreground/50"
+          className="dc-serif bg-transparent outline-none text-[15px] font-semibold text-foreground flex-1 min-w-[4rem] placeholder:text-muted-foreground/50"
         />
         {canEdit && (
           <>
@@ -8208,7 +8215,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
           onChange={(e) => { setTitle(e.target.value); onUpdate({ title: e.target.value }); }}
           placeholder="Sem título"
           disabled={!canEdit}
-          className="bg-transparent outline-none text-sm font-semibold text-foreground flex-1 min-w-[4rem] placeholder:text-muted-foreground/50"
+          className="dc-serif bg-transparent outline-none text-[15px] font-semibold text-foreground flex-1 min-w-[4rem] placeholder:text-muted-foreground/50"
         />
         {canEdit && (
           <>
@@ -9532,9 +9539,9 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
 
   const baseCls: any = {
     paragraph: "text-[15px] leading-7 text-foreground py-1",
-    h1: "text-3xl font-bold text-foreground py-2 mt-4",
-    h2: "text-2xl font-bold text-foreground py-2 mt-3",
-    h3: "text-xl font-bold text-foreground py-1.5 mt-2",
+    h1: "dc-serif text-[34px] font-semibold text-foreground py-2 mt-4",
+    h2: "dc-serif text-[26px] font-semibold text-foreground py-2 mt-3",
+    h3: "dc-serif text-[21px] font-semibold text-foreground py-1.5 mt-2",
     bullet: "text-[15px] leading-7 text-foreground py-0.5",
     numbered: "text-[15px] leading-7 text-foreground py-0.5",
     quote: "text-[15px] leading-7 text-foreground py-1 italic border-l-4 border-primary pl-4 my-1 bg-muted/30 rounded-r-md",
