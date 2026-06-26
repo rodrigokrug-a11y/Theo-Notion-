@@ -54,6 +54,8 @@ const SLASH_ITEMS = [
   { type: "callout", label: "Destaque", desc: "Destaque informações", display: "💡", style: "" },
   { type: "code", label: "Código", desc: "Trecho de código", display: "{}", style: "text-xs font-mono font-bold" },
   { type: "divider", label: "Divisor", desc: "Linha separadora", display: "—", style: "text-xl leading-none" },
+  { type: "toc", label: "Sumário", desc: "Índice com os títulos da página", display: "≡", style: "text-lg leading-none", kw: "sumario indice toc conteudos titulos" },
+  { type: "bookmark", label: "Bookmark de link", desc: "Cartão clicável para uma URL", display: "🔖", style: "", kw: "bookmark link url site web favorito" },
   { type: "image", label: "Imagem", desc: "Insira uma imagem", display: "🖼", style: "" },
   { type: "table", label: "Tabela", desc: "Tabela editável", display: "⊞", style: "text-xl leading-none" },
   { type: "sketch", label: "Manuscrito", desc: "Bloco para escrever à mão", display: "✍️", style: "" },
@@ -3606,6 +3608,20 @@ function pageChipHtml(page: any) {
   const title = (page.title || "Sem título").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return '<span data-page-id="' + page.id + '" contenteditable="false" class="inline-flex items-center gap-1 text-primary font-semibold px-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer select-none transition-colors mx-1"><span class="text-xs pointer-events-none">' + pageIconHtml(page.icon) + '</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">' + title + '</span></span>&nbsp;';
 }
+// Detecta se um bloco (recursivo) contém um link/menção para a página alvo.
+function blockLinksToId(b: any, targetId: string): boolean {
+  if (!b) return false;
+  const needle = 'data-page-id="' + targetId + '"';
+  if (typeof b.html === "string" && b.html.indexOf(needle) !== -1) return true;
+  if (b.type === "pageref" && b.pageId === targetId) return true;
+  if (Array.isArray(b.children) && b.children.some((c: any) => blockLinksToId(c, targetId))) return true;
+  if (Array.isArray(b.rows)) { for (const row of b.rows) { if (Array.isArray(row)) { for (const cell of row) { if (typeof cell === "string" && cell.indexOf(needle) !== -1) return true; } } } }
+  return false;
+}
+function pageLinksToId(page: any, targetId: string): boolean {
+  const content = Array.isArray(page.content) ? page.content : [];
+  return content.some((b: any) => blockLinksToId(b, targetId));
+}
 // Compatibilidade: webfonts antigas (Remix) ainda injetadas p/ ícones ri- já salvos.
 const UICON_CSS = ["https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css"];
 let uiconsLinked = false;
@@ -4508,6 +4524,38 @@ function AppContent({ db, user, files }: any) {
     }
   };
 
+  // Duplica uma página e todas as suas subpáginas (estrutura completa)
+  const duplicatePage = async (id: string) => {
+    if (!canEdit) return;
+    try {
+      const byId = new Map((Array.isArray(pages) ? pages : []).map((p) => [p.id, p]));
+      const src = byId.get(id);
+      if (!src) return;
+      const childrenOf = (pid: string) => (Array.isArray(pages) ? pages : []).filter((p) => p.parent_id === pid && !p.deleted_at).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      const created: any[] = [];
+      const cloneRec = async (origId: string, newParentId: string | null, suffix: string): Promise<any> => {
+        const o = byId.get(origId);
+        if (!o) return null;
+        const sibCount = (Array.isArray(pages) ? pages : []).filter((p) => p.parent_id === newParentId && !p.deleted_at).length + created.filter((p) => p.parent_id === newParentId).length;
+        const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, content, sort_order) VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *", [user.id, newParentId, (o.title || "Sem título") + suffix, o.icon || "ic:file-text", JSON.stringify(o.content || []), sibCount]);
+        const np = parseRows(r)[0];
+        created.push(np);
+        for (const k of childrenOf(origId)) await cloneRec(k.id, np.id, "");
+        return np;
+      };
+      const root = await cloneRec(id, src.parent_id, " (cópia)");
+      setPages((prev) => [...prev, ...created]);
+      if (root) {
+        if (src.parent_id) setExpanded((e) => ({ ...e, [src.parent_id]: true }));
+        setActiveId(root.id);
+        setView("page");
+      }
+      toast(created.length > 1 ? "Página e " + (created.length - 1) + " subpágina(s) duplicadas" : "Página duplicada", "success");
+    } catch (e: any) {
+      toast("Erro ao duplicar: " + e.message, "error");
+    }
+  };
+
   const flushSavesNow = async () => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     const changes = pendingChanges.current;
@@ -4665,6 +4713,7 @@ function AppContent({ db, user, files }: any) {
             { label: "Nova subpágina", icon: <span className="text-sm">➕</span>, onClick: () => createPage(activePage.id), divider: true },
             { label: "Novo caderno (subpágina)", icon: <span className="text-sm">✏️</span>, onClick: () => createPage(activePage.id, "canvas") },
             { label: "Novo diagrama (subpágina)", icon: <span className="text-sm">🗺️</span>, onClick: () => createPage(activePage.id, "diagram") },
+            { label: "Duplicar página", icon: <span className="text-sm">⧉</span>, onClick: () => duplicatePage(activePage.id), divider: true },
             { label: "Mover para...", icon: <span className="text-sm">📁</span>, onClick: () => setMoveTarget(activePage) },
             { label: "Excluir página", icon: <span className="text-sm">🗑️</span>, onClick: () => { if (confirm("Mover \"" + (activePage.title || "Sem título") + "\" e suas subpáginas para a lixeira?")) softDelete(activePage.id); }, divider: true },
           ]}
@@ -4690,7 +4739,7 @@ function AppContent({ db, user, files }: any) {
         <Sidebar
           pages={pages} activeId={activeId} expanded={expanded} setExpanded={setExpanded}
           onSelect={(id: string) => { setActiveId(id); setView("page"); closeSidebarOnMobile(); }}
-          onCreate={createPage} onToggleFav={toggleFav} onDelete={softDelete} onMove={movePage}
+          onCreate={createPage} onToggleFav={toggleFav} onDelete={softDelete} onMove={movePage} onDuplicate={duplicatePage}
           onReorder={reorderPages}
           onShowTrash={() => { setView("trash"); closeSidebarOnMobile(); }} onShowSearch={() => { setSearchOpen(true); closeSidebarOnMobile(); }}
           onClose={() => setSidebarOpen(false)} user={user} canEdit={canEdit} view={view}
@@ -4911,7 +4960,7 @@ function Breadcrumbs({ pages, activePage, onSelect }: any) {
   );
 }
 
-function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, onToggleFav, onDelete, onMove, onReorder, onShowTrash, onShowSearch, onClose, user, canEdit, view, onMoveDialog, onGoHome, width = 256 }: any) {
+function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, onToggleFav, onDelete, onMove, onDuplicate, onReorder, onShowTrash, onShowSearch, onClose, user, canEdit, view, onMoveDialog, onGoHome, width = 256 }: any) {
   const roots = (Array.isArray(pages)?pages:[]).filter((p: any) => !p.parent_id && !p.deleted_at).sort((a: any, b: any) => a.sort_order - b.sort_order);
   const favs = (Array.isArray(pages)?pages:[]).filter((p: any) => p.is_favorite && !p.deleted_at);
   const recentes = [...pages]
@@ -5051,7 +5100,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
           {secOpen.paginas && (
             <>
               {(Array.isArray(roots)?roots:[]).map((p: any) => (
-                <PageNode key={p.id} page={p} pages={pages} level={0} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={view === "page"} onMoveDialog={onMoveDialog} />
+                <PageNode key={p.id} page={p} pages={pages} level={0} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={view === "page"} onMoveDialog={onMoveDialog} />
               ))}
               {roots.length === 0 && (<div className="px-2 py-3 text-xs text-muted-foreground italic text-center">Nenhuma página ainda.<br />{canEdit && "Clique em + acima para criar."}</div>)}
             </>
@@ -5071,7 +5120,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
   );
 }
 
-function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelect, onCreate, onToggleFav, onDelete, onMove, onReorder, dragId, setDragId, dropTargetId, setDropTargetId, canEdit, viewActive, onMoveDialog }: any) {
+function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelect, onCreate, onToggleFav, onDelete, onMove, onDuplicate, onReorder, dragId, setDragId, dropTargetId, setDropTargetId, canEdit, viewActive, onMoveDialog }: any) {
   const children = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === page.id && !p.deleted_at).sort((a: any, b: any) => a.sort_order - b.sort_order);
   const isOpen = !!expanded[page.id];
   const hasChildren = children.length > 0;
@@ -5135,6 +5184,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
                 { label: "Nova subpágina", icon: <span className="text-sm">➕</span>, onClick: () => { setExpanded((x: any) => ({ ...x, [page.id]: true })); onCreate(page.id); } },
                 { label: "Novo caderno (subpágina)", icon: <span className="text-sm">✏️</span>, onClick: () => { setExpanded((x: any) => ({ ...x, [page.id]: true })); onCreate(page.id, "canvas"); } },
                 { label: "Novo diagrama (subpágina)", icon: <span className="text-sm">🗺️</span>, onClick: () => { setExpanded((x: any) => ({ ...x, [page.id]: true })); onCreate(page.id, "diagram"); } },
+                { label: "Duplicar", icon: <span className="text-sm">⧉</span>, onClick: () => onDuplicate && onDuplicate(page.id) },
                 { label: "Mover para...", icon: <span className="text-sm">📁</span>, onClick: () => onMoveDialog(page) },
                 { label: "Excluir página" + (hasChildren ? " e subpáginas" : ""), icon: <span className="text-sm">🗑️</span>, onClick: () => { if (confirm("Mover \"" + (page.title || "Sem título") + "\"" + (hasChildren ? " e suas " + children.length + " subpágina(s)" : "") + " para a lixeira?")) onDelete(page.id); }, divider: true },
               ]}
@@ -5147,7 +5197,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
       {isOpen && hasChildren && (
         <div className="ml-3 pl-1 border-l border-border/40">
           {(Array.isArray(children)?children:[]).map((c: any) => (
-            <PageNode key={c.id} page={c} pages={pages} level={level + 1} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={viewActive} onMoveDialog={onMoveDialog} />
+            <PageNode key={c.id} page={c} pages={pages} level={level + 1} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={viewActive} onMoveDialog={onMoveDialog} />
           ))}
         </div>
       )}
@@ -5171,6 +5221,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
   const updateBlocks = (next: any[]) => onUpdate({ content: next });
   const blocks = page.content || [];
   const subs = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === page.id && !p.deleted_at);
+  const backlinks = (Array.isArray(pages)?pages:[]).filter((p: any) => p.id !== page.id && !p.deleted_at && pageLinksToId(p, page.id));
 
   const isCoverColor = page.cover_url?.startsWith("#");
   const hasCover = !!page.cover_url;
@@ -5233,6 +5284,21 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
             </div>
           )}
         </div>
+
+        {backlinks.length > 0 && (
+          <div className="mt-8 pt-5 border-t border-border/60">
+            <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-2 mb-3"><span>🔗</span>Referências <span className="text-xs text-muted-foreground font-normal">({backlinks.length})</span></h3>
+            <div className="space-y-1">
+              {(Array.isArray(backlinks)?backlinks:[]).map((p: any) => (
+                <button key={p.id} onClick={() => onSelectPage(p.id)} className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md hover:bg-accent transition-colors group" type="button">
+                  <span className="text-base shrink-0">{pageIconNode(p.icon)}</span>
+                  <span className="text-sm text-foreground truncate flex-1">{p.title || "Sem título"}</span>
+                  <span className="text-muted-foreground opacity-0 group-hover:opacity-100 text-xs">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {showIconPicker && (
         <IconPicker
@@ -8663,10 +8729,12 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     if (type === "toggle") { patch.open = false; patch.children = [newBlock()]; }
     if (type === "embed_diagram" || type === "embed_canvas") { patch.type = "pageref"; patch.refKind = type === "embed_diagram" ? "diagram" : "canvas"; patch.pageId = null; patch.html = ""; }
     if (type === "mermaid") { patch.html = "graph TD\n  A[Início] --> B{Decisão}\n  B -->|Sim| C[Faz isso]\n  B -->|Não| D[Faz aquilo]"; }
+    if (type === "bookmark") { patch.url = ""; patch.html = ""; }
+    if (type === "toc") { patch.html = ""; }
     const realType = patch.type || type;
     const next = [...list]; next[idx] = { ...cur, ...patch };
 
-    if (realType === "divider" || realType === "sketch") {
+    if (realType === "divider" || realType === "sketch" || realType === "toc") {
       const nb = newBlock("paragraph");
       next.splice(idx + 1, 0, nb);
       onChange(next); setSlash(null); setFocusId(nb.id);
@@ -8825,7 +8893,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   return (
     <div className="space-y-1 relative">
       {(Array.isArray(list)?list:[]).map((block, i) => (
-        <div key={block.id} className="group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5">
+        <div key={block.id} id={"blk-" + block.id} className="group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5">
           {canEdit && (
             <div contentEditable={false} className="absolute left-2 top-1.5 opacity-0 group-hover/block:opacity-100 transition-opacity flex items-center justify-center select-none z-50">
               <CustomMenu
@@ -9318,6 +9386,68 @@ function MermaidBlock({ block, onUpdate, onBackspace, autoFocus, onAutoFocused, 
   );
 }
 
+function TocBlock({ allBlocks }: any) {
+  const heads = (Array.isArray(allBlocks) ? allBlocks : []).filter((b: any) => b.type === "h1" || b.type === "h2" || b.type === "h3");
+  const go = (id: string) => { try { const el = document.getElementById("blk-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} };
+  return (
+    <div className="my-1 border-l-2 border-border pl-3 py-1" contentEditable={false}>
+      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Sumário</div>
+      {heads.length === 0 ? (
+        <div className="text-sm text-muted-foreground italic">Adicione títulos (H1/H2/H3) para gerar o índice</div>
+      ) : (
+        (Array.isArray(heads) ? heads : []).map((b: any) => (
+          <button key={b.id} onClick={() => go(b.id)} className={"block w-full text-left text-sm text-muted-foreground hover:text-primary hover:underline py-0.5 truncate " + (b.type === "h2" ? "pl-3" : b.type === "h3" ? "pl-6" : "font-medium")} type="button">
+            {htmlToText(b.html) || "Sem título"}
+          </button>
+        ))
+      )}
+    </div>
+  );
+}
+
+function BookmarkBlock({ block, onUpdate, onBackspace, canEdit }: any) {
+  const [editing, setEditing] = useState(!block.url);
+  const [val, setVal] = useState(block.url || "");
+  const save = () => {
+    let u = (val || "").trim();
+    if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
+    onUpdate({ url: u });
+    setEditing(false);
+  };
+  if (editing && canEdit) {
+    return (
+      <div className="my-1 border-2 border-border rounded-lg p-2" style={{ backgroundColor: "hsl(var(--card))" }} contentEditable={false}>
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } else if (e.key === "Backspace" && !val) { onBackspace && onBackspace(); } }}
+          placeholder="Cole uma URL (ex.: https://exemplo.com)"
+          className="w-full h-9 px-2 rounded-md border-2 border-input bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <div className="flex justify-end gap-2 mt-2">
+          <button onClick={() => { if (block.url) { setVal(block.url); setEditing(false); } else if (onBackspace) onBackspace(); }} className="h-7 px-2 text-xs text-muted-foreground hover:bg-accent rounded-md transition-colors" type="button">Cancelar</button>
+          <button onClick={save} className="h-7 px-3 text-xs font-semibold bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity" type="button">Salvar</button>
+        </div>
+      </div>
+    );
+  }
+  let domain = block.url || "";
+  try { domain = new URL(block.url).hostname.replace(/^www\./, ""); } catch (e) {}
+  return (
+    <div className="my-1" contentEditable={false}>
+      <a href={block.url} target="_blank" rel="noreferrer noopener" className="flex items-center gap-3 border-2 border-border rounded-lg px-3 py-2.5 hover:bg-accent transition-colors no-underline group/bm" style={{ backgroundColor: "hsl(var(--card))" }}>
+        <span className="text-xl shrink-0">🌐</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-foreground truncate">{domain || block.url}</span>
+          <span className="block text-xs text-muted-foreground truncate">{block.url}</span>
+        </span>
+        {canEdit && <button onClick={(e) => { e.preventDefault(); setVal(block.url || ""); setEditing(true); }} className="opacity-0 group-hover/bm:opacity-100 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-background shrink-0 transition-opacity" type="button">Editar</button>}
+      </a>
+    </div>
+  );
+}
+
 function BlockRenderer(props: any) {
   const { block } = props;
   switch (block.type) {
@@ -9332,6 +9462,8 @@ function BlockRenderer(props: any) {
     case "sketch": return <SketchBlock {...props} />;
     case "pageref": return <PageRefBlock {...props} />;
     case "mermaid": return <MermaidBlock {...props} />;
+    case "toc": return <TocBlock {...props} />;
+    case "bookmark": return <BookmarkBlock {...props} />;
     default: return <TextBlock {...props} />;
   }
 }

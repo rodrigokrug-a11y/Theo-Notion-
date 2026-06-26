@@ -112,9 +112,15 @@ O `content` (JSONB) define o **tipo da página**, detectado pelo primeiro item:
 - **Editor de documentos** — blocos via menu `/` (`SLASH_ITEMS`): texto,
   títulos, listas, tarefas, toggle, citação, callout, código, divisor,
   imagem, tabela, manuscrito, **embeds** de diagrama/caderno, **Mermaid**
-  (texto → fluxograma), **link de página** (`/` → "Link de página", ou `@`)
-  e **nova página linkada** (`/` → "Nova página") — ambos inserem um "chip"
-  clicável que navega para a página.
+  (texto → fluxograma), **link de página** (`/` → "Link de página", ou `@`),
+  **nova página linkada** (`/` → "Nova página"), **sumário** (`/sumário` —
+  índice clicável dos títulos) e **bookmark** (`/bookmark` — cartão de URL).
+  Formatação inline via barra flutuante (negrito/itálico/sublinhado/tachado/
+  código/cor/realce/link).
+- **Referências (backlinks)** — cada página lista, no rodapé, as páginas que
+  linkam para ela (varre o conteúdo por `data-page-id`).
+- **Duplicar página** — no menu da página (cabeçalho e barra lateral): copia a
+  página e todas as subpáginas.
 - **CanvasEditor** — caderno de desenho (SVG, pan/zoom, ferramentas) com
   multi-seleção por laço, **copiar/colar/recortar** e **agrupar/desagrupar**
   (Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+G e botões na barra do topo).
