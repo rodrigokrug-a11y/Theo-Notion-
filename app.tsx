@@ -2078,20 +2078,22 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const g = edgeGeom(ed);
     if (!g) return null;
     const col = ed.color || "#64748b";
-    const sw = 2;
+    const sw = ed.sw || 2;
+    const hsz = sw * 4 + 3; // ponta proporcional à espessura
+    const dash = ed.style === "dashed" ? (sw * 3) + " " + (sw * 2.5) : ed.style === "dotted" ? (Math.max(0.4, sw * 0.1)) + " " + (sw * 2.2) : undefined;
     // Ponta da seta orientada pela tangente da curva (controle → ponta)
     const endTan = g.cv ? g.cp : g.p1;
     const startTan = g.cv ? g.cp : g.p2;
-    const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, sw * 5) : null;
-    const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, sw * 5) : null;
+    const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
+    const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
     const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
     const mid = bezierPt(g.p1, g.cp, g.p2, 0.5);
     const mx = mid.x, my = mid.y;
     const isSel = selected && selected.type === "edge" && selected.id === ed.id;
     return (
       <g key={ed.id}>
-        {isSel && <path d={d} stroke="hsl(var(--primary))" strokeWidth={6} fill="none" opacity={0.25} strokeLinecap="round" />}
-        <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={ed.style === "dashed" ? "6 5" : undefined} />
+        {isSel && <path d={d} stroke="hsl(var(--primary))" strokeWidth={sw + 5} fill="none" opacity={0.25} strokeLinecap="round" />}
+        <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={dash} />
         {ah && <polygon points={ah.poly} fill={col} />}
         {sh && <polygon points={sh.poly} fill={col} />}
         {ed.label && !(editing && editing.id === ed.id) && (
@@ -2274,30 +2276,61 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         </div>
       )}
 
-      {/* Barra da seta selecionada */}
-      {canEdit && selected && selected.type === "edge" && !editing && (
-        <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5 max-w-[94vw] overflow-x-auto">
-          <button onClick={() => { const ed = edgesRef.current.find((x: any) => x.id === selected.id); if (ed) startEditEdge(ed); }} className={eBtn} title="Editar rótulo" type="button">🏷️ Rótulo</button>
-          <div className="w-px h-5 bg-border" />
-          <button onClick={() => patchEdge((e: any) => ({ arrowStart: !e.arrowStart }))} className={eBtn} title="Ponta no início" type="button">◄ Início</button>
-          <button onClick={() => patchEdge((e: any) => ({ arrowEnd: e.arrowEnd === false ? true : false }))} className={eBtn} title="Ponta no fim" type="button">Fim ►</button>
-          <button onClick={() => patchEdge((e: any) => ({ style: e.style === "dashed" ? "solid" : "dashed" }))} className={eBtn} title="Tracejado" type="button">┄ Tracejado</button>
-          <div className="w-px h-5 bg-border" />
-          {(() => {
-            const ed = edgesRef.current.find((x: any) => x.id === selected.id);
-            const cur = ed && ed.curve != null ? ed.curve : 0;
-            return (
-              <div className="flex items-center gap-1 px-1" title="Curvar a seta (arraste); 0 = reta">
-                <span className="text-xs">〰️</span>
-                <input type="range" min={-160} max={160} step={4} value={cur} onChange={(e) => patchEdge({ curve: parseFloat(e.target.value) })} className="w-20 accent-primary" />
-                <button onClick={() => patchEdge({ curve: 0 })} className="h-7 px-2 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-accent transition-colors" title="Deixar reta" type="button">Reta</button>
-              </div>
-            );
-          })()}
-          <div className="w-px h-5 bg-border" />
-          <button onClick={deleteSelected} className={eBtn} title="Excluir seta" type="button">🗑️ Excluir</button>
-        </div>
-      )}
+      {/* Barra da seta selecionada — opções completas */}
+      {canEdit && selected && selected.type === "edge" && !editing && (() => {
+        const ed = edgesRef.current.find((x: any) => x.id === selected.id);
+        if (!ed) return null;
+        const aEnd = ed.arrowEnd !== false, aStart = !!ed.arrowStart;
+        const endsMode = (!aStart && !aEnd) ? "none" : (aStart && aEnd) ? "both" : aStart ? "start" : "end";
+        const style = ed.style || "solid";
+        const sw = ed.sw || 2;
+        const cur = ed.curve != null ? ed.curve : 0;
+        const seg = (active: boolean) => "h-7 min-w-[1.9rem] px-1 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent");
+        const EDGE_COLORS = ["#64748b", "#0f172a", "#2563eb", "#16a34a", "#dc2626", "#ea580c", "#9333ea"];
+        return (
+          <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-1 max-w-[94vw] overflow-x-auto">
+            <button onClick={() => startEditEdge(ed)} className={eBtn} title="Editar rótulo" type="button">🏷️ Rótulo</button>
+            <div className="w-px h-5 bg-border" />
+            {/* Pontas */}
+            <div className="flex items-center gap-0.5" title="Pontas da seta">
+              <button onClick={() => patchEdge({ arrowStart: false, arrowEnd: false })} className={seg(endsMode === "none")} title="Sem ponta (linha)" type="button">—</button>
+              <button onClick={() => patchEdge({ arrowStart: false, arrowEnd: true })} className={seg(endsMode === "end")} title="Ponta no fim" type="button">→</button>
+              <button onClick={() => patchEdge({ arrowStart: true, arrowEnd: false })} className={seg(endsMode === "start")} title="Ponta no início" type="button">←</button>
+              <button onClick={() => patchEdge({ arrowStart: true, arrowEnd: true })} className={seg(endsMode === "both")} title="Pontas dos dois lados" type="button">↔</button>
+            </div>
+            <div className="w-px h-5 bg-border" />
+            {/* Espessura */}
+            <div className="flex items-center gap-0.5" title="Espessura da linha">
+              {[1.5, 3, 5].map((w, i) => (
+                <button key={w} onClick={() => patchEdge({ sw: w })} className={seg(Math.abs(sw - w) < 0.6)} title={"Espessura " + ["fina", "média", "grossa"][i]} type="button"><span className="rounded-full bg-current" style={{ width: (3 + i * 3) + "px", height: (3 + i * 3) + "px" }} /></button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-border" />
+            {/* Estilo do traço */}
+            <div className="flex items-center gap-0.5" title="Estilo do traço">
+              <button onClick={() => patchEdge({ style: "solid" })} className={seg(style === "solid")} title="Sólida" type="button">─</button>
+              <button onClick={() => patchEdge({ style: "dashed" })} className={seg(style === "dashed")} title="Tracejada" type="button">┄</button>
+              <button onClick={() => patchEdge({ style: "dotted" })} className={seg(style === "dotted")} title="Pontilhada" type="button">⋯</button>
+            </div>
+            <div className="w-px h-5 bg-border" />
+            {/* Curvatura */}
+            <div className="flex items-center gap-1 px-1" title="Curvar a seta (arraste); 0 = reta">
+              <span className="text-xs">〰️</span>
+              <input type="range" min={-160} max={160} step={4} value={cur} onChange={(e) => patchEdge({ curve: parseFloat(e.target.value) })} className="w-16 accent-primary" />
+              <button onClick={() => patchEdge({ curve: 0 })} className="h-7 px-2 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-accent transition-colors" title="Deixar reta" type="button">Reta</button>
+            </div>
+            <div className="w-px h-5 bg-border" />
+            {/* Cor da seta */}
+            <div className="flex items-center gap-0.5" title="Cor da seta">
+              {EDGE_COLORS.map((c) => (
+                <button key={c} onClick={() => patchEdge({ color: c })} className={"w-5 h-5 rounded-full border transition-transform " + ((ed.color || "#64748b") === c ? "ring-2 ring-primary scale-110" : "hover:scale-110")} style={{ backgroundColor: c, borderColor: "hsl(var(--border))" }} title={c} type="button" />
+              ))}
+            </div>
+            <div className="w-px h-5 bg-border" />
+            <button onClick={deleteSelected} className={eBtn} title="Excluir seta (Delete)" type="button">🗑️</button>
+          </div>
+        );
+      })()}
 
       {/* Dica em diagrama vazio */}
       {canEdit && nodes.length === 0 && !editing && (
