@@ -247,7 +247,16 @@ const DIAGRAM_SHAPES = [
   { id: "triangle", label: "Triângulo", icon: "△" },
   { id: "parallelogram", label: "Dado", icon: "▱" },
   { id: "hexagon", label: "Hexágono", icon: "⬡" },
+  { id: "pentagon", label: "Pentágono", icon: "⬠" },
+  { id: "octagon", label: "Octógono", icon: "⛶" },
+  { id: "star", label: "Estrela", icon: "☆" },
+  { id: "trapezoid", label: "Trapézio", icon: "⏢" },
+  { id: "cross", label: "Cruz", icon: "✚" },
+  { id: "line", label: "Linha", icon: "─" },
+  { id: "arrow", label: "Seta", icon: "↗" },
+  { id: "darrow", label: "Seta dupla", icon: "↔" },
 ];
+const DIAGRAM_LINE_SHAPES = ["line", "arrow", "darrow"];
 const DIAGRAM_PALETTE = [
   { bg: "#ffffff", border: "#334155", text: "#0f172a" },
   { bg: "#dbeafe", border: "#2563eb", text: "#1e3a8a" },
@@ -1740,22 +1749,26 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const i = group.findIndex((e: any) => e.id === ed.id);
     return (i - (group.length - 1) / 2) * 52;
   };
+  const anchorPt = (n: any, anc: any) => (anc ? { x: n.x + anc.ax * n.w, y: n.y + anc.ay * n.h } : null);
   const edgeGeom = (ed: any) => {
     const a = nodeById(ed.from), b = nodeById(ed.to);
     if (!a || !b) return null;
     const ca = centerOf(a), cb = centerOf(b);
+    const aFix = anchorPt(a, ed.fromAnchor), bFix = anchorPt(b, ed.toAnchor);
     // Perpendicular fixa pelo par (não depende do sentido) → ida e volta ficam em lados opostos
     const lowFirst = ed.from < ed.to;
-    const A0 = lowFirst ? ca : cb, B0 = lowFirst ? cb : ca;
-    const vx = B0.x - A0.x, vy = B0.y - A0.y, vl = Math.hypot(vx, vy) || 1;
+    const PA = lowFirst ? (aFix || ca) : (bFix || cb), PB = lowFirst ? (bFix || cb) : (aFix || ca);
+    const vx = PB.x - PA.x, vy = PB.y - PA.y, vl = Math.hypot(vx, vy) || 1;
     const nx = -vy / vl, ny = vx / vl;
     const cv = ed.curve != null ? ed.curve : autoCurveOf(ed);
-    let p1 = borderPoint(a, cb.x, cb.y), p2 = borderPoint(b, ca.x, ca.y);
+    let p1 = aFix || borderPoint(a, (bFix || cb).x, (bFix || cb).y);
+    let p2 = bFix || borderPoint(b, (aFix || ca).x, (aFix || ca).y);
     if (cv) {
       const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
       const cp = { x: mx + nx * cv, y: my + ny * cv };
-      // Recalcula as pontas mirando o ponto de controle (saem retas da forma)
-      p1 = borderPoint(a, cp.x, cp.y); p2 = borderPoint(b, cp.x, cp.y);
+      // Pontas livres miram o ponto de controle; pontas fixas (âncoras) não se mexem
+      if (!aFix) p1 = borderPoint(a, cp.x, cp.y);
+      if (!bFix) p2 = borderPoint(b, cp.x, cp.y);
       return { p1, p2, cp, cv };
     }
     return { p1, p2, cp: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, cv: 0 };
@@ -1954,6 +1967,29 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
     if (effTool === "pan") { gestureRef.current = { kind: "pan", x: e.clientX, y: e.clientY, tx, ty }; return; }
 
+    // Alças da seta selecionada: pontas (reconectar/mover ponto) e alça de curvar
+    if (canEdit && selected && selected.type === "edge") {
+      const ed = edgesRef.current.find((x: any) => x.id === selected.id);
+      const g = ed ? edgeGeom(ed) : null;
+      if (ed && g) {
+        const R = 13 / scale;
+        if (Math.hypot(p.x - g.p1.x, p.y - g.p1.y) <= R) { gestureRef.current = { kind: "edgept", id: ed.id, end: "from", moved: false, snap: snap() }; return; }
+        if (Math.hypot(p.x - g.p2.x, p.y - g.p2.y) <= R) { gestureRef.current = { kind: "edgept", id: ed.id, end: "to", moved: false, snap: snap() }; return; }
+        const apex = bezierPt(g.p1, g.cp, g.p2, 0.5);
+        if (Math.hypot(p.x - apex.x, p.y - apex.y) <= R) {
+          const a = nodeById(ed.from), b = nodeById(ed.to);
+          const ca = centerOf(a), cb = centerOf(b);
+          const aFix = anchorPt(a, ed.fromAnchor), bFix = anchorPt(b, ed.toAnchor);
+          const lowFirst = ed.from < ed.to;
+          const PA = lowFirst ? (aFix || ca) : (bFix || cb), PB = lowFirst ? (bFix || cb) : (aFix || ca);
+          const vx = PB.x - PA.x, vy = PB.y - PA.y, vl = Math.hypot(vx, vy) || 1;
+          const bp1 = aFix || borderPoint(a, cb.x, cb.y), bp2 = bFix || borderPoint(b, ca.x, ca.y);
+          gestureRef.current = { kind: "edgecurve", id: ed.id, mbx: (bp1.x + bp2.x) / 2, mby: (bp1.y + bp2.y) / 2, nx: -vy / vl, ny: vx / vl, moved: false, snap: snap() };
+          return;
+        }
+      }
+    }
+
     // alças de redimensionamento
     if (canEdit && selected && selected.type === "node") {
       const n = nodeById(selected.id);
@@ -2041,6 +2077,33 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       setEdgeDraft({ fromId: g.fromId, x: p.x, y: p.y, targetId: tgt && tgt.id !== g.fromId ? tgt.id : null });
       return;
     }
+    if (g.kind === "edgecurve") {
+      const cv = Math.max(-400, Math.min(400, Math.round(2 * ((p.x - g.mbx) * g.nx + (p.y - g.mby) * g.ny))));
+      g.moved = true;
+      setData(nodesRef.current, edgesRef.current.map((e: any) => (e.id === g.id ? { ...e, curve: cv } : e)));
+      return;
+    }
+    if (g.kind === "edgept") {
+      const tgt = nodeUnder(p);
+      if (tgt) {
+        let ax = Math.min(1, Math.max(0, (p.x - tgt.x) / Math.max(1, tgt.w)));
+        let ay = Math.min(1, Math.max(0, (p.y - tgt.y) / Math.max(1, tgt.h)));
+        const dl = ax, dr = 1 - ax, dt = ay, dbm = 1 - ay, m = Math.min(dl, dr, dt, dbm);
+        if (m === dl) ax = 0; else if (m === dr) ax = 1; else if (m === dt) ay = 0; else ay = 1;
+        const anc = { ax: Math.round(ax * 100) / 100, ay: Math.round(ay * 100) / 100 };
+        const e0 = edgesRef.current.find((e: any) => e.id === g.id);
+        if (e0) {
+          const newFrom = g.end === "from" ? tgt.id : e0.from;
+          const newTo = g.end === "to" ? tgt.id : e0.to;
+          if (newFrom !== newTo) {
+            const patch = g.end === "from" ? { from: tgt.id, fromAnchor: anc } : { to: tgt.id, toAnchor: anc };
+            g.moved = true;
+            setData(nodesRef.current, edgesRef.current.map((e: any) => (e.id === g.id ? { ...e, ...patch } : e)));
+          }
+        }
+      }
+      return;
+    }
   };
 
   const onPointerUp = (e: any) => {
@@ -2052,6 +2115,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (!g) return;
     if (g.kind === "drag" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "resize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
+    else if ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "connect") {
       const p = getPos(e);
       const tgt = nodeUnder(p);
@@ -2079,6 +2143,15 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const stroke = n.color && n.color !== "transparent" ? n.color : "transparent";
     const sw = 2;
     if (n.shape === "text") return null;
+    if (DIAGRAM_LINE_SHAPES.indexOf(n.shape) !== -1) {
+      const c = n.color && n.color !== "transparent" ? n.color : "#334155";
+      const lw = n.lw || 3, hsz = lw * 4 + 4;
+      let x1 = n.x, y1 = n.y + n.h, x2 = n.x + n.w, y2 = n.y;
+      const heads: any[] = [];
+      if (n.shape !== "line") { const ah = arrowHeadAt(x1, y1, x2, y2, hsz); heads.push(<polygon key="he" points={ah.poly} fill={c} />); x2 = ah.bx; y2 = ah.by; }
+      if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
+      return <g><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth={lw} strokeLinecap="round" />{heads}</g>;
+    }
     if (n.shape === "rect") return <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={sw} />;
     if (n.shape === "ellipse") return <ellipse cx={n.x + n.w / 2} cy={n.y + n.h / 2} rx={Math.max(1, n.w / 2)} ry={Math.max(1, n.h / 2)} fill={fill} stroke={stroke} strokeWidth={sw} />;
     if (n.shape === "triangle") return <polygon points={(n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
@@ -2087,7 +2160,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const renderNode = (n: any) => (
     <g key={n.id}>
       {renderNodeShape(n)}
-      {!(editing && editing.id === n.id) && (
+      {!(editing && editing.id === n.id) && (n.text || DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1) && (
         <foreignObject x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} style={{ pointerEvents: "none" }}>
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>
             {n.text}
@@ -2187,6 +2260,21 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               ))}
             </g>
           )}
+          {/* Alças da seta selecionada: pontas (reconectar/mover) + curvar arrastando */}
+          {canEdit && effTool === "select" && selected && selected.type === "edge" && (() => {
+            const ed = edgesRef.current.find((x: any) => x.id === selected.id);
+            const g = ed ? edgeGeom(ed) : null;
+            if (!g) return null;
+            const apex = bezierPt(g.p1, g.cp, g.p2, 0.5);
+            const r = 6 / scale;
+            return (
+              <g>
+                <circle cx={g.p1.x} cy={g.p1.y} r={r} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.8 / scale} />
+                <circle cx={g.p2.x} cy={g.p2.y} r={r} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.8 / scale} />
+                <circle cx={apex.x} cy={apex.y} r={r * 1.05} fill="hsl(var(--primary))" stroke="#ffffff" strokeWidth={1.6 / scale} />
+              </g>
+            );
+          })()}
         </g>
       </svg>
 
@@ -4851,20 +4939,24 @@ function dgAutoCurve(ed: any, edges: any[]) {
   const i = group.findIndex((e: any) => e.id === ed.id);
   return (i - (group.length - 1) / 2) * 52;
 }
+function dgAnchorPt(n: any, anc: any) { return anc ? { x: n.x + anc.ax * n.w, y: n.y + anc.ay * n.h } : null; }
 function dgEdgeGeom(ed: any, nodes: any[], edges: any[]) {
   const a = nodes.find((n: any) => n.id === ed.from), b = nodes.find((n: any) => n.id === ed.to);
   if (!a || !b) return null;
   const ca = dgCenter(a), cb = dgCenter(b);
+  const aFix = dgAnchorPt(a, ed.fromAnchor), bFix = dgAnchorPt(b, ed.toAnchor);
   const lowFirst = ed.from < ed.to;
-  const A0 = lowFirst ? ca : cb, B0 = lowFirst ? cb : ca;
-  const vx = B0.x - A0.x, vy = B0.y - A0.y, vl = Math.hypot(vx, vy) || 1;
+  const PA = lowFirst ? (aFix || ca) : (bFix || cb), PB = lowFirst ? (bFix || cb) : (aFix || ca);
+  const vx = PB.x - PA.x, vy = PB.y - PA.y, vl = Math.hypot(vx, vy) || 1;
   const nx = -vy / vl, ny = vx / vl;
   const cv = ed.curve != null ? ed.curve : dgAutoCurve(ed, edges);
-  let p1 = dgBorderPoint(a, cb.x, cb.y), p2 = dgBorderPoint(b, ca.x, ca.y);
+  let p1 = aFix || dgBorderPoint(a, (bFix || cb).x, (bFix || cb).y);
+  let p2 = bFix || dgBorderPoint(b, (aFix || ca).x, (aFix || ca).y);
   if (cv) {
     const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
     const cp = { x: mx + nx * cv, y: my + ny * cv };
-    p1 = dgBorderPoint(a, cp.x, cp.y); p2 = dgBorderPoint(b, cp.x, cp.y);
+    if (!aFix) p1 = dgBorderPoint(a, cp.x, cp.y);
+    if (!bFix) p2 = dgBorderPoint(b, cp.x, cp.y);
     return { p1, p2, cp, cv };
   }
   return { p1, p2, cp: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, cv: 0 };
@@ -4904,16 +4996,28 @@ function DiagramPreview({ content }: any) {
         const fill = n.bg && n.bg !== "transparent" ? n.bg : "transparent";
         const stroke = n.color && n.color !== "transparent" ? n.color : "transparent";
         let shape: any = null;
-        if (n.shape === "rect") shape = <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={2} />;
+        if (n.shape === "line" || n.shape === "arrow" || n.shape === "darrow") {
+          const c = n.color && n.color !== "transparent" ? n.color : "#334155";
+          const lw = n.lw || 3, hsz = lw * 4 + 4;
+          let x1 = n.x, y1 = n.y + n.h, x2 = n.x + n.w, y2 = n.y;
+          const heads: any[] = [];
+          if (n.shape !== "line") { const ah = arrowHeadAt(x1, y1, x2, y2, hsz); heads.push(<polygon key="he" points={ah.poly} fill={c} />); x2 = ah.bx; y2 = ah.by; }
+          if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
+          shape = <g><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth={lw} strokeLinecap="round" />{heads}</g>;
+        }
+        else if (n.shape === "rect") shape = <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={2} />;
         else if (n.shape === "ellipse") shape = <ellipse cx={n.x + n.w / 2} cy={n.y + n.h / 2} rx={Math.max(1, n.w / 2)} ry={Math.max(1, n.h / 2)} fill={fill} stroke={stroke} strokeWidth={2} />;
         else if (n.shape === "triangle") shape = <polygon points={(n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)} fill={fill} stroke={stroke} strokeWidth={2} strokeLinejoin="round" />;
         else if (n.shape !== "text") shape = <polygon points={shapePoints({ kind: n.shape, x: n.x, y: n.y, w: n.w, h: n.h })} fill={fill} stroke={stroke} strokeWidth={2} strokeLinejoin="round" />;
+        const showTxt = n.text || (n.shape !== "line" && n.shape !== "arrow" && n.shape !== "darrow");
         return (
           <g key={n.id}>
             {shape}
+            {showTxt && (
             <foreignObject x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)}>
               <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>{n.text}</div>
             </foreignObject>
+            )}
           </g>
         );
       })}
