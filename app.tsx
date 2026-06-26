@@ -9868,17 +9868,17 @@ function PageLinkDialog({ pages, onClose, onPick }: any) {
 }
 
 function NewPageDialog({ onClose, onCreate }: any) {
-  const [title, setTitle] = useState("");
+  const [pageTitle, setPageTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
-  const submit = async () => { if (busy) return; setBusy(true); try { await onCreate(title.trim()); } finally { setBusy(false); } };
+  const submit = async () => { if (busy) return; setBusy(true); try { await onCreate(pageTitle.trim()); } finally { setBusy(false); } };
   return (
     <CustomDialog open={true} onClose={onClose} title="Criar página linkada">
       <input
         ref={inputRef}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        value={pageTitle}
+        onChange={(e) => setPageTitle(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
         placeholder="Título da nova página..."
         className="w-full h-9 px-3 mb-3 rounded-md border-2 border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -9942,11 +9942,11 @@ function CommandPalette({ pages, onClose, onSelect }: any) {
   const matches = pages
     .filter((p: any) => !p.deleted_at)
     .map((p: any) => {
-      const title = (p.title || "Sem título").toLowerCase();
+      const titleLc = (p.title || "Sem título").toLowerCase();
       const body = blocksToText(p.content || []).toLowerCase().slice(0, 500);
       const ql = q.toLowerCase().trim();
       if (!ql) return { p, score: 0, hit: "" };
-      if (title.includes(ql)) return { p, score: 10, hit: p.title || "Sem título" };
+      if (titleLc.includes(ql)) return { p, score: 10, hit: p.title || "Sem título" };
       if (body.includes(ql)) {
         const idx = body.indexOf(ql);
         return { p, score: 5, hit: "..." + body.slice(Math.max(0, idx - 20), Math.min(body.length, idx + ql.length + 30)) + "..." };
