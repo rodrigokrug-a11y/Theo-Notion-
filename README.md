@@ -111,8 +111,9 @@ O `content` (JSONB) define o **tipo da página**, detectado pelo primeiro item:
 
 - **Editor de documentos** — blocos via menu `/` (`SLASH_ITEMS`): texto,
   títulos, listas, tarefas, toggle, citação, callout, código, divisor,
-  imagem, tabela, manuscrito, e **embeds** de diagrama/caderno e **Mermaid**
-  (texto → fluxograma).
+  imagem, tabela, manuscrito, **embeds** de diagrama/caderno, **Mermaid**
+  (texto → fluxograma) e **link de página** (`/` → "Link de página", ou `@`)
+  que insere um "chip" clicável para outra página.
 - **CanvasEditor** — caderno de desenho (SVG, pan/zoom, ferramentas) com
   multi-seleção por laço, **copiar/colar/recortar** e **agrupar/desagrupar**
   (Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+G e botões na barra do topo).
@@ -121,13 +122,16 @@ O `content` (JSONB) define o **tipo da página**, detectado pelo primeiro item:
   multi-seleção por laço, **agrupar/desagrupar**, **copiar/colar/recortar**
   (Ctrl+C / Ctrl+V / Ctrl+X e botões na barra do topo), desfazer/refazer,
   paleta de cores.
-- **IconPicker** — ícones flat (**Remix Icon** via jsDelivr) + emojis.
+- **IconPicker** — ~1750 ícones flat **SVG embutidos** (monocromáticos, base
+  Lucide + curados, sem CDN; busca em português) + emojis.
 
 ### CDNs externos carregados sob demanda
 
-- **Remix Icon** — `cdn.jsdelivr.net/npm/remixicon@4.6.0` (ícones flat).
 - **Mermaid** — para o bloco "Diagrama por texto".
 - **pdf.js** — para importação/leitura de PDF.
+
+> Os ícones planos NÃO usam CDN: são SVGs embutidos no `app.tsx`
+> (`ICON_SVGS`/`ICON_LIST`), gerados a partir do pacote `lucide-static`.
 
 Carregados via `<link>`/`loadScriptOnce` com URLs de fallback — exigem
 acesso à internet no ambiente onde o app roda.
