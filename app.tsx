@@ -1081,9 +1081,21 @@ function AppContent({ db, user, files }: any) {
     });
   }, [activeId, pages.length]);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(max-width: 767px)").matches);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !(typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(max-width: 767px)").matches));
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [isResizing, setIsResizing] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const on = () => setIsMobile(mq.matches);
+    on();
+    if (mq.addEventListener) mq.addEventListener("change", on); else mq.addListener(on);
+    return () => { if (mq.removeEventListener) mq.removeEventListener("change", on); else mq.removeListener(on); };
+  }, []);
+  // Ao alternar entre celular e desktop, ajusta o estado padrão da barra lateral.
+  useEffect(() => { setSidebarOpen(!isMobile); }, [isMobile]);
+  const closeSidebarOnMobile = () => { if (isMobile) setSidebarOpen(false); };
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -1355,22 +1367,30 @@ function AppContent({ db, user, files }: any) {
 
   return (
     <div className="min-h-screen flex bg-background">
+      {/* Backdrop do menu lateral no celular */}
+      {isMobile && sidebarOpen && (
+        <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setSidebarOpen(false)} />
+      )}
       <div
-        className={"relative shrink-0 overflow-hidden h-screen sticky top-0 " + (isResizing ? "" : "transition-[width] duration-200 ease-out")}
-        style={{ width: sidebarOpen ? sidebarWidth + "px" : "0px" }}
+        className={
+          isMobile
+            ? ("fixed inset-y-0 left-0 z-50 h-screen shadow-2xl transition-transform duration-200 ease-out " + (sidebarOpen ? "translate-x-0" : "-translate-x-full"))
+            : ("relative shrink-0 overflow-hidden h-screen sticky top-0 " + (isResizing ? "" : "transition-[width] duration-200 ease-out"))
+        }
+        style={isMobile ? { width: Math.min(sidebarWidth, 300) + "px" } : { width: sidebarOpen ? sidebarWidth + "px" : "0px" }}
       >
         <Sidebar
           pages={pages} activeId={activeId} expanded={expanded} setExpanded={setExpanded}
-          onSelect={(id: string) => { setActiveId(id); setView("page"); }}
+          onSelect={(id: string) => { setActiveId(id); setView("page"); closeSidebarOnMobile(); }}
           onCreate={createPage} onToggleFav={toggleFav} onDelete={softDelete} onMove={movePage}
           onReorder={reorderPages}
-          onShowTrash={() => setView("trash")} onShowSearch={() => setSearchOpen(true)}
+          onShowTrash={() => { setView("trash"); closeSidebarOnMobile(); }} onShowSearch={() => { setSearchOpen(true); closeSidebarOnMobile(); }}
           onClose={() => setSidebarOpen(false)} user={user} canEdit={canEdit} view={view}
           onMoveDialog={(p: any) => setMoveTarget(p)}
-          onGoHome={() => { setActiveId(null); setView("page"); }}
-          width={sidebarWidth}
+          onGoHome={() => { setActiveId(null); setView("page"); closeSidebarOnMobile(); }}
+          width={isMobile ? Math.min(sidebarWidth, 300) : sidebarWidth}
         />
-        {sidebarOpen && (
+        {sidebarOpen && !isMobile && (
           <div
             className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/40 z-40 transition-colors"
             onMouseDown={(e) => {
@@ -2819,7 +2839,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const eBtn = "h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors";
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100vh - 48px)", WebkitUserSelect: "none" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
@@ -4508,7 +4528,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
   const pillStyle: any = {};
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100vh - 48px)", WebkitTouchCallout: "none", WebkitUserSelect: "none" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100dvh - 48px)", WebkitTouchCallout: "none", WebkitUserSelect: "none" }}>
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full touch-none"
