@@ -113,7 +113,9 @@ O `content` (JSONB) define o **tipo da página**, detectado pelo primeiro item:
   títulos, listas, tarefas, toggle, citação, callout, código, divisor,
   imagem, tabela, manuscrito, e **embeds** de diagrama/caderno e **Mermaid**
   (texto → fluxograma).
-- **CanvasEditor** — caderno de desenho (SVG, pan/zoom, ferramentas).
+- **CanvasEditor** — caderno de desenho (SVG, pan/zoom, ferramentas) com
+  multi-seleção por laço, **copiar/colar/recortar** e **agrupar/desagrupar**
+  (Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+G e botões na barra do topo).
 - **DiagramEditor** — diagramas conectados tipo Miro: formas, texto dentro
   das formas, setas curvas (ponta em um ou nos dois lados), múltiplas setas,
   multi-seleção por laço, **agrupar/desagrupar**, **copiar/colar/recortar**

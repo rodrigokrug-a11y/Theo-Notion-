@@ -2693,6 +2693,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
   const [importMenu, setImportMenu] = useState(false);
   const importModeRef = useRef<string>("pages");
   const [multiSel, setMultiSel] = useState<string[] | null>([]);
+  const [clipReady, setClipReady] = useState<boolean>(!!(CANVAS_CLIP && CANVAS_CLIP.length)); // habilita botão "Colar"
   const [marquee, setMarquee] = useState<any>(null);
   const marqueeRef = useRef<any>(null);
   const [aspectLock, setAspectLock] = useState(true);
@@ -3012,6 +3013,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
     const ids = multiSel && multiSel.length ? multiSel : groupIdsOf(selectedId);
     if (!ids.length) return false;
     CANVAS_CLIP = ids.map((id) => elsRef.current.find((el) => el.id === id)).filter(Boolean).map((el) => clone(el));
+    setClipReady(CANVAS_CLIP.length > 0);
     return CANVAS_CLIP.length > 0;
   };
   const pasteClipboard = () => {
@@ -3030,6 +3032,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
     if (ids.length > 1) { setMultiSel(ids); setSelectedId(null); }
     else { setSelectedId(ids[0]); setMultiSel(null); }
     CANVAS_CLIP = copies.map((c) => clone(c)); // próxima colagem segue em cascata
+    setClipReady(true);
     return true;
   };
 
@@ -3122,7 +3125,9 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
       if (meta && e.key.toLowerCase() === "c") { if (copySelection()) e.preventDefault(); return; }
       if (meta && e.key.toLowerCase() === "x") { if (copySelection()) { e.preventDefault(); deleteSelected(); } return; }
       if (meta && e.key.toLowerCase() === "v") { if (pasteClipboard()) e.preventDefault(); return; }
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedId) { e.preventDefault(); deleteSelected(); return; }
+      if (meta && e.key.toLowerCase() === "g" && !e.shiftKey) { e.preventDefault(); groupSelected(); return; }
+      if (meta && e.key.toLowerCase() === "g" && e.shiftKey) { e.preventDefault(); ungroupSelected(); return; }
+      if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || (multiSel && multiSel.length))) { e.preventDefault(); deleteSelected(); return; }
       if (e.key === "Escape") { setSelectedId(null); return; }
       if (!meta && !e.altKey && !e.shiftKey) {
         const k = e.key.toLowerCase();
@@ -4262,7 +4267,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
           <div className="text-center text-muted-foreground/40 px-6">
             <div className="text-6xl mb-3">✏️</div>
             <p className="text-sm font-medium">Escolha uma ferramenta e desenhe — a espessura segue a pressão da caneta ou a velocidade do mouse</p>
-            <p className="text-xs mt-1.5">Duplo clique cria texto · Ctrl+C/Ctrl+V copia e cola a seleção · pinça dá zoom · 📄 importa PDF para escrever por cima</p>
+            <p className="text-xs mt-1.5">Duplo clique cria texto · Ctrl+C/Ctrl+V copia e cola · laço seleciona vários e Ctrl+G agrupa · pinça dá zoom · 📄 importa PDF para escrever por cima</p>
           </div>
         </div>
       )}
@@ -4284,6 +4289,22 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
             <button onClick={redo} disabled={!future.length} className={"h-8 w-8 shrink-0 flex items-center justify-center rounded-xl transition-colors text-base " + (future.length ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed")} title="Refazer (Ctrl+Y)" type="button">↪</button>
           </>
         )}
+        {canEdit && (() => {
+          const ids = multiSel && multiSel.length ? multiSel : (selectedId ? groupIdsOf(selectedId) : []);
+          const hasSel = ids.length > 0;
+          const canGroup = !!(multiSel && multiSel.length > 1);
+          const canUngroup = !canGroup && ids.length > 1;
+          const tb = (on: boolean) => "h-8 px-2 shrink-0 hidden lg:flex items-center rounded-xl text-xs font-medium transition-colors " + (on ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed");
+          return (
+            <>
+              <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden lg:block" />
+              <button onClick={() => copySelection()} disabled={!hasSel} className={tb(hasSel)} title="Copiar seleção (Ctrl+C)" type="button">⧉ Copiar</button>
+              <button onClick={() => pasteClipboard()} disabled={!clipReady} className={tb(clipReady)} title="Colar (Ctrl+V)" type="button">📋 Colar</button>
+              <button onClick={groupSelected} disabled={!canGroup} className={tb(canGroup)} title="Agrupar — movem juntos (Ctrl+G)" type="button">⊞ Agrupar</button>
+              <button onClick={ungroupSelected} disabled={!canUngroup} className={tb(canUngroup)} title="Desagrupar (Ctrl+Shift+G)" type="button">⊟ Desagrupar</button>
+            </>
+          );
+        })()}
         <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden sm:block" />
         <button onClick={() => zoomBy(1 / 1.2)} className="h-8 w-8 shrink-0 hidden sm:flex items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-lg font-bold" title="Diminuir zoom" type="button">−</button>
         <button onClick={resetView} className="h-8 px-1 shrink-0 flex items-center justify-center rounded-xl text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors min-w-[2.6rem]" title="Restaurar zoom (100%)" type="button">{Math.round(scale * 100)}%</button>
