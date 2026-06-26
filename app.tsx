@@ -257,6 +257,9 @@ const DIAGRAM_PALETTE = [
 ];
 
 const clone = (o: any) => JSON.parse(JSON.stringify(o));
+// Área de transferência interna (copiar/colar entre cadernos e diagramas)
+let CANVAS_CLIP: any[] = [];
+let DIAGRAM_CLIP: any = null;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const dist2 = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
 
@@ -546,7 +549,7 @@ function parseMarkdownInline(text: string): string {
   const codeSpans: string[] = [];
   text = text.replace(/`([^`\n]+)`/g, (_, code) => {
     codeSpans.push(code);
-    return " CODE" + (codeSpans.length - 1) + " ";
+    return "CODE" + (codeSpans.length - 1) + "";
   });
   text = text.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
   text = text.replace(/__([^_\n]+)__/g, "<strong>$1</strong>");
@@ -554,7 +557,7 @@ function parseMarkdownInline(text: string): string {
   text = text.replace(/(^|[^a-zA-Z0-9_])_([^_\n]+)_(?=$|[^a-zA-Z0-9_])/g, "$1<em>$2</em>");
   text = text.replace(/~~([^~\n]+)~~/g, "<s>$1</s>");
   text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" class="text-primary underline" target="_blank" rel="noopener">$1</a>');
-  text = text.replace(/ CODE(\d+) /g, (_, idx) => {
+  text = text.replace(/CODE(\d+)/g, (_, idx) => {
     return '<code class="px-1 py-0.5 rounded bg-muted text-foreground font-mono text-[0.9em]">' + codeSpans[parseInt(idx)] + "</code>";
   });
   return text;
@@ -1705,16 +1708,52 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const s = Math.min(sx, sy);
     return { x: cx + dx * s, y: cy + dy * s };
   };
+  // Curvatura automática: separa setas paralelas e de ida/volta entre o mesmo par
+  const autoCurveOf = (ed: any) => {
+    const list = edgesRef.current;
+    const key = (e: any) => (e.from < e.to ? e.from + "|" + e.to : e.to + "|" + e.from);
+    const k = key(ed);
+    const group = list.filter((e: any) => key(e) === k);
+    if (group.length <= 1) return 0;
+    const i = group.findIndex((e: any) => e.id === ed.id);
+    return (i - (group.length - 1) / 2) * 52;
+  };
   const edgeGeom = (ed: any) => {
     const a = nodeById(ed.from), b = nodeById(ed.to);
     if (!a || !b) return null;
     const ca = centerOf(a), cb = centerOf(b);
-    return { p1: borderPoint(a, cb.x, cb.y), p2: borderPoint(b, ca.x, ca.y) };
+    // Perpendicular fixa pelo par (não depende do sentido) → ida e volta ficam em lados opostos
+    const lowFirst = ed.from < ed.to;
+    const A0 = lowFirst ? ca : cb, B0 = lowFirst ? cb : ca;
+    const vx = B0.x - A0.x, vy = B0.y - A0.y, vl = Math.hypot(vx, vy) || 1;
+    const nx = -vy / vl, ny = vx / vl;
+    const cv = ed.curve != null ? ed.curve : autoCurveOf(ed);
+    let p1 = borderPoint(a, cb.x, cb.y), p2 = borderPoint(b, ca.x, ca.y);
+    if (cv) {
+      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      const cp = { x: mx + nx * cv, y: my + ny * cv };
+      // Recalcula as pontas mirando o ponto de controle (saem retas da forma)
+      p1 = borderPoint(a, cp.x, cp.y); p2 = borderPoint(b, cp.x, cp.y);
+      return { p1, p2, cp, cv };
+    }
+    return { p1, p2, cp: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, cv: 0 };
+  };
+  const bezierPt = (p1: any, cp: any, p2: any, t: number) => {
+    const u = 1 - t;
+    return { x: u * u * p1.x + 2 * u * t * cp.x + t * t * p2.x, y: u * u * p1.y + 2 * u * t * cp.y + t * t * p2.y };
   };
   const edgeHit = (ed: any, p: any) => {
     const g = edgeGeom(ed);
     if (!g) return false;
-    return distToSeg(p, g.p1, g.p2) <= 9 / scale;
+    const thr = 9 / scale;
+    if (!g.cv) return distToSeg(p, g.p1, g.p2) <= thr;
+    let prev = g.p1;
+    for (let i = 1; i <= 14; i++) {
+      const cur = bezierPt(g.p1, g.cp, g.p2, i / 14);
+      if (distToSeg(p, prev, cur) <= thr) return true;
+      prev = cur;
+    }
+    return false;
   };
   const anchorsOf = (n: any) => [
     { side: "top", x: n.x + n.w / 2, y: n.y },
@@ -1723,7 +1762,6 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     { side: "left", x: n.x, y: n.y + n.h / 2 },
   ];
   const nodeUnder = (p: any) => [...nodesRef.current].reverse().find((n: any) => pointInBox(p, { x: n.x, y: n.y, w: n.w, h: n.h }, 0));
-  const edgeExists = (a: string, b: string) => edgesRef.current.some((e: any) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
 
   const newNode = (shape: string, cx: number, cy: number) => {
     const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
@@ -1754,6 +1792,23 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
   const startEditNode = (n: any) => { setSelected({ type: "node", id: n.id }); setEditing({ id: n.id, value: n.text || "" }); };
   const startEditEdge = (ed: any) => { setSelected({ type: "edge", id: ed.id }); setEditing({ id: ed.id, edge: true, value: ed.label || "" }); };
+
+  // Copiar / colar / recortar item (Ctrl+C / Ctrl+V / Ctrl+X)
+  const copyDiagram = () => {
+    if (!selected || selected.type !== "node") return false;
+    const n = nodeById(selected.id);
+    if (!n) return false;
+    DIAGRAM_CLIP = clone(n);
+    return true;
+  };
+  const pasteDiagram = () => {
+    if (!DIAGRAM_CLIP) return false;
+    const n = { ...clone(DIAGRAM_CLIP), id: uid(), x: (DIAGRAM_CLIP.x || 0) + 32, y: (DIAGRAM_CLIP.y || 0) + 32 };
+    commit([...nodesRef.current, n], edgesRef.current);
+    setSelected({ type: "node", id: n.id });
+    DIAGRAM_CLIP = clone(n); // próxima colagem segue em cascata
+    return true;
+  };
 
   const deleteSelected = () => {
     if (!selected) return;
@@ -1843,6 +1898,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       const meta = e.ctrlKey || e.metaKey;
       if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
       if (meta && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
+      if (meta && e.key.toLowerCase() === "c") { if (copyDiagram()) e.preventDefault(); return; }
+      if (meta && e.key.toLowerCase() === "x") { if (copyDiagram()) { e.preventDefault(); deleteSelected(); } return; }
+      if (meta && e.key.toLowerCase() === "v") { if (pasteDiagram()) e.preventDefault(); return; }
       if ((e.key === "Delete" || e.key === "Backspace") && selected) { e.preventDefault(); deleteSelected(); return; }
       if (e.key === "Escape") { setSelected(null); setShapePanel(false); return; }
       if (e.key === "Enter" && selected && selected.type === "node") { e.preventDefault(); const n = nodeById(selected.id); if (n) startEditNode(n); return; }
@@ -1975,7 +2033,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     else if (g.kind === "connect") {
       const p = getPos(e);
       const tgt = nodeUnder(p);
-      if (tgt && tgt.id !== g.fromId && !edgeExists(g.fromId, tgt.id)) {
+      if (tgt && tgt.id !== g.fromId) {
         const ne = { id: uid(), from: g.fromId, to: tgt.id, color: "#64748b", label: "", arrowEnd: true, style: "solid" };
         commit(nodesRef.current, [...edgesRef.current, ne]);
         setSelected({ type: "edge", id: ne.id });
@@ -2021,16 +2079,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (!g) return null;
     const col = ed.color || "#64748b";
     const sw = 2;
-    const ah = ed.arrowEnd !== false ? arrowHeadAt(g.p1.x, g.p1.y, g.p2.x, g.p2.y, sw * 5) : null;
-    const sh = ed.arrowStart ? arrowHeadAt(g.p2.x, g.p2.y, g.p1.x, g.p1.y, sw * 5) : null;
-    const x1 = sh ? sh.bx : g.p1.x, y1 = sh ? sh.by : g.p1.y;
-    const x2 = ah ? ah.bx : g.p2.x, y2 = ah ? ah.by : g.p2.y;
-    const mx = (g.p1.x + g.p2.x) / 2, my = (g.p1.y + g.p2.y) / 2;
+    // Ponta da seta orientada pela tangente da curva (controle → ponta)
+    const endTan = g.cv ? g.cp : g.p1;
+    const startTan = g.cv ? g.cp : g.p2;
+    const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, sw * 5) : null;
+    const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, sw * 5) : null;
+    const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+    const mid = bezierPt(g.p1, g.cp, g.p2, 0.5);
+    const mx = mid.x, my = mid.y;
     const isSel = selected && selected.type === "edge" && selected.id === ed.id;
     return (
       <g key={ed.id}>
-        {isSel && <line x1={g.p1.x} y1={g.p1.y} x2={g.p2.x} y2={g.p2.y} stroke="hsl(var(--primary))" strokeWidth={6} opacity={0.25} strokeLinecap="round" />}
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={sw} strokeLinecap="round" strokeDasharray={ed.style === "dashed" ? "6 5" : undefined} />
+        {isSel && <path d={d} stroke="hsl(var(--primary))" strokeWidth={6} fill="none" opacity={0.25} strokeLinecap="round" />}
+        <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={ed.style === "dashed" ? "6 5" : undefined} />
         {ah && <polygon points={ah.poly} fill={col} />}
         {sh && <polygon points={sh.poly} fill={col} />}
         {ed.label && !(editing && editing.id === ed.id) && (
@@ -2130,7 +2191,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const ed = edgesRef.current.find((x: any) => x.id === editing.id);
         const g = ed ? edgeGeom(ed) : null;
         if (!g) return null;
-        const mx = (g.p1.x + g.p2.x) / 2, my = (g.p1.y + g.p2.y) / 2;
+        const mid = bezierPt(g.p1, g.cp, g.p2, 0.5); const mx = mid.x, my = mid.y;
         return (
           <div className="absolute z-40" style={{ left: mx * scale + tx - 70, top: my * scale + ty - 14 }} onPointerDown={(e) => e.stopPropagation()}>
             <input
@@ -2222,6 +2283,18 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           <button onClick={() => patchEdge((e: any) => ({ arrowEnd: e.arrowEnd === false ? true : false }))} className={eBtn} title="Ponta no fim" type="button">Fim ►</button>
           <button onClick={() => patchEdge((e: any) => ({ style: e.style === "dashed" ? "solid" : "dashed" }))} className={eBtn} title="Tracejado" type="button">┄ Tracejado</button>
           <div className="w-px h-5 bg-border" />
+          {(() => {
+            const ed = edgesRef.current.find((x: any) => x.id === selected.id);
+            const cur = ed && ed.curve != null ? ed.curve : 0;
+            return (
+              <div className="flex items-center gap-1 px-1" title="Curvar a seta (arraste); 0 = reta">
+                <span className="text-xs">〰️</span>
+                <input type="range" min={-160} max={160} step={4} value={cur} onChange={(e) => patchEdge({ curve: parseFloat(e.target.value) })} className="w-20 accent-primary" />
+                <button onClick={() => patchEdge({ curve: 0 })} className="h-7 px-2 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-accent transition-colors" title="Deixar reta" type="button">Reta</button>
+              </div>
+            );
+          })()}
+          <div className="w-px h-5 bg-border" />
           <button onClick={deleteSelected} className={eBtn} title="Excluir seta" type="button">🗑️ Excluir</button>
         </div>
       )}
@@ -2232,7 +2305,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           <div className="text-center text-muted-foreground/50 px-6">
             <div className="text-6xl mb-3">🗺️</div>
             <p className="text-sm font-medium">Clique numa forma à esquerda para começar — ou dê um duplo clique no quadro</p>
-            <p className="text-xs mt-1.5">Passe o mouse numa forma e arraste pelas bolinhas para conectar · duplo clique escreve dentro · arraste os cantos para redimensionar · pinça/Ctrl+scroll dá zoom</p>
+            <p className="text-xs mt-1.5">Arraste pelas bolinhas para conectar (várias setas entre os mesmos itens, indo e voltando, vários→um e um→vários) · selecione a seta para curvar · duplo clique escreve dentro · Ctrl+C/Ctrl+V copia e cola · arraste os cantos para redimensionar · pinça/Ctrl+scroll dá zoom</p>
           </div>
         </div>
       )}
@@ -2606,6 +2679,31 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
     setSelectedId(copies[copies.length - 1].id);
     setMultiSel(fromMarquee ? (Array.isArray(copies)?copies:[]).map((c) => c.id) : null);
   };
+  // Copiar / colar / recortar (Ctrl+C / Ctrl+V / Ctrl+X)
+  const copySelection = () => {
+    const ids = multiSel && multiSel.length ? multiSel : groupIdsOf(selectedId);
+    if (!ids.length) return false;
+    CANVAS_CLIP = ids.map((id) => elsRef.current.find((el) => el.id === id)).filter(Boolean).map((el) => clone(el));
+    return CANVAS_CLIP.length > 0;
+  };
+  const pasteClipboard = () => {
+    if (!CANVAS_CLIP.length) return false;
+    flushPendingNow();
+    const gmap: any = {};
+    const copies = CANVAS_CLIP.map((el) => {
+      const t = translateEl(el, 28, 28);
+      t.id = uid();
+      if (t.group) { if (!gmap[t.group]) gmap[t.group] = uid(); t.group = gmap[t.group]; }
+      return t;
+    });
+    if (tool !== "select") pickTool("select");
+    applyEls(elsRef.current, [...elsRef.current, ...copies]);
+    const ids = copies.map((c) => c.id);
+    if (ids.length > 1) { setMultiSel(ids); setSelectedId(null); }
+    else { setSelectedId(ids[0]); setMultiSel(null); }
+    CANVAS_CLIP = copies.map((c) => clone(c)); // próxima colagem segue em cascata
+    return true;
+  };
 
   const pickTool = (t: string) => {
     if (teRef.current) commitText();
@@ -2693,6 +2791,9 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
       const meta = e.ctrlKey || e.metaKey;
       if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
       if (meta && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
+      if (meta && e.key.toLowerCase() === "c") { if (copySelection()) e.preventDefault(); return; }
+      if (meta && e.key.toLowerCase() === "x") { if (copySelection()) { e.preventDefault(); deleteSelected(); } return; }
+      if (meta && e.key.toLowerCase() === "v") { if (pasteClipboard()) e.preventDefault(); return; }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) { e.preventDefault(); deleteSelected(); return; }
       if (e.key === "Escape") { setSelectedId(null); return; }
       if (!meta && !e.altKey && !e.shiftKey) {
@@ -2704,7 +2805,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [past, future, els, selectedId, paper, bg, canEdit, textEdit]);
+  }, [past, future, els, selectedId, multiSel, tool, paper, bg, canEdit, textEdit]);
 
   const getPos = (e: any) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -3833,7 +3934,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
           <div className="text-center text-muted-foreground/40 px-6">
             <div className="text-6xl mb-3">✏️</div>
             <p className="text-sm font-medium">Escolha uma ferramenta e desenhe — a espessura segue a pressão da caneta ou a velocidade do mouse</p>
-            <p className="text-xs mt-1.5">Duplo clique cria texto · pinça dá zoom · 📄 importa PDF para escrever por cima</p>
+            <p className="text-xs mt-1.5">Duplo clique cria texto · Ctrl+C/Ctrl+V copia e cola a seleção · pinça dá zoom · 📄 importa PDF para escrever por cima</p>
           </div>
         </div>
       )}
