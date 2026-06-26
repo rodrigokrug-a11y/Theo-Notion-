@@ -5404,6 +5404,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const pointersRef = useRef<Map<number, any>>(new Map());
   const pinchRef = useRef<any>(null);
   const tapRef = useRef<any>(null); // detecção de toque-duplo (iPad não dispara dblclick)
+  const tapDownRef = useRef<any>(null); // posição/tempo do toque para distinguir toque de arraste
   const pastRef = useRef<any[]>([]);
   const futureRef = useRef<any[]>([]);
 
@@ -5556,6 +5557,26 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const cx = r ? (r.width / 2 - tx) / scale : 200;
     const cy = r ? (r.height / 2 - ty) / scale : 200;
     addNodeAt(shape, { x: cx, y: cy });
+  };
+  // Cria uma nova forma já conectada por uma seta, na direção escolhida
+  const quickAddConnected = (fromId: string, dir: string) => {
+    const n = nodeById(fromId);
+    if (!n) return;
+    const gap = 80;
+    const shape = (n.shape && DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1 && n.shape !== "image" && n.shape !== "text") ? n.shape : "rect";
+    const w = 160, h = 80;
+    let cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+    if (dir === "bottom") cy = n.y + n.h + gap + h / 2;
+    else if (dir === "top") cy = n.y - gap - h / 2;
+    else if (dir === "right") cx = n.x + n.w + gap + w / 2;
+    else cx = n.x - gap - w / 2; // left
+    const newN: any = newNode(shape, cx, cy);
+    newN.fontSize = n.fontSize || newN.fontSize;
+    const ne = { id: uid(), from: fromId, to: newN.id, color: "#64748b", label: "", arrowEnd: true, style: "solid" };
+    commit([...nodesRef.current, newN], [...edgesRef.current, ne]);
+    setSelected({ type: "node", id: newN.id });
+    setMultiSel([]);
+    setEditing({ id: newN.id, value: "" });
   };
   const newLineNode = (shape: string, box: any) => {
     const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
@@ -5928,6 +5949,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       return;
     }
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    tapDownRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), type: e.pointerType };
     if (editRef.current) commitEditing();
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
     // pinça com 2 dedos
@@ -6169,17 +6191,18 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       setEdgeDraft(null);
     }
 
-    // Toque-duplo (touch/caneta) para editar — o iPad não dispara onDoubleClick com touch-action:none
-    if (e.pointerType !== "mouse" && canEdit && !drawShape) {
-      const moved = (g.kind === "drag" && g.moved) || (g.kind === "resize" && g.moved) || (g.kind === "lineend" && g.moved) ||
-        g.kind === "pan" || g.kind === "connect" || g.kind === "drawline" ||
-        ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved);
-      if (!moved) {
+    // Toque-duplo (touch/caneta) para editar — o iPad não dispara onDoubleClick com touch-action:none.
+    // Usa distância em PIXELS de tela (não o g.moved, que dispara com 1px de jitter do dedo).
+    if (e.pointerType !== "mouse" && canEdit && !drawShape && g.kind !== "drawline" && g.kind !== "connect") {
+      const down = tapDownRef.current;
+      const dist = down ? Math.hypot(e.clientX - down.x, e.clientY - down.y) : 999;
+      const dur = down ? Date.now() - down.t : 999;
+      if (dist < 12 && dur < 600) { // foi um toque (não um arraste)
         const p = getPos(e);
         const now = Date.now();
         const last = tapRef.current;
-        const near = last && Math.hypot(p.x - last.x, p.y - last.y) < 26 / scale;
-        if (last && near && now - last.t < 380) {
+        const near = last && Math.hypot(p.x - last.x, p.y - last.y) < 30 / scale;
+        if (last && near && now - last.t < 420) {
           tapRef.current = null;
           const hn = nodeUnder(p);
           if (hn) { startEditNode(hn); return; }
@@ -6611,6 +6634,26 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           )}
         </div>
       )}
+
+      {/* Botões de "criar forma conectada" ao redor do nó selecionado */}
+      {canEdit && effTool === "select" && selNode && multiSel.length <= 1 && !editing && !drawShape && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (() => {
+        const n = selNode;
+        const L = n.x * scale + tx, T = n.y * scale + ty, W = n.w * scale, H = n.h * scale;
+        const off = 13, sz = 24;
+        const cls = "absolute z-20 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md shadow-primary/30 hover:scale-110 active:scale-95 transition-transform";
+        const plus = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>;
+        const mk = (dir: string, st: any) => (
+          <button key={dir} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); quickAddConnected(n.id, dir); }} className={cls} style={{ width: sz, height: sz, ...st }} title="Criar forma conectada com seta" type="button">{plus}</button>
+        );
+        return (
+          <>
+            {mk("top", { left: L + W / 2 - sz / 2, top: T - off - sz })}
+            {mk("bottom", { left: L + W / 2 - sz / 2, top: T + H + off })}
+            {mk("left", { left: L - off - sz, top: T + H / 2 - sz / 2 })}
+            {mk("right", { left: L + W + off, top: T + H / 2 - sz / 2 })}
+          </>
+        );
+      })()}
 
       {/* Barra da seta selecionada — opções completas */}
       {canEdit && selected && selected.type === "edge" && !editing && (() => {
