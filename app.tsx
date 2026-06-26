@@ -4967,8 +4967,20 @@ function Breadcrumbs({ pages, activePage, onSelect }: any) {
   );
 }
 
-// Chip colorido do tipo de página (índigo=doc, âmbar=caderno, teal=diagrama)
+// Tinta legível (escura ou branca) conforme a luminância da cor de fundo
+function readableInk(hex: string) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || "");
+  if (!m) return "#1b1a17";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.62 ? "#1b1a17" : "#ffffff";
+}
+// Chip colorido do ícone. Se a página tem cor no topo (cover_url = "#..."),
+// usa essa cor como fundo do ícone (no menu lateral) p/ identificar mais fácil.
 function pageTypeChip(p: any) {
+  const cv = p && p.cover_url;
+  if (typeof cv === "string" && cv.charAt(0) === "#") return { bg: cv, fg: readableInk(cv) };
   if (isDiagramPage(p)) return { bg: "rgba(30,142,126,0.15)", fg: "#1E8E7E" };
   if (isCanvasPage(p)) return { bg: "rgba(190,122,30,0.16)", fg: "#BE7A1E" };
   return { bg: "rgba(91,69,217,0.13)", fg: "#5B45D9" };
@@ -5288,7 +5300,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {(Array.isArray(subs)?subs:[]).map((s: any) => (
                 <button key={s.id} onClick={() => onSelectPage(s.id)} className="group w-full flex items-center gap-3 p-3 rounded-2xl border border-border hover:border-primary transition-all text-left hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-14px_rgba(91,69,217,0.45)]" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
-                  <span className="h-9 w-9 rounded-xl bg-accent flex items-center justify-center text-base text-foreground shrink-0 transition-colors group-hover:bg-primary/10 group-hover:text-primary">{pageIconNode(s.icon)}</span>
+                  <span className="h-9 w-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ backgroundColor: pageTypeChip(s).bg, color: pageTypeChip(s).fg }}>{pageIconNode(s.icon)}</span>
                   <span className="text-sm font-medium text-foreground truncate flex-1">{s.title || "Sem título"}</span>
                   <svg className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
                 </button>
