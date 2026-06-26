@@ -2,7 +2,7 @@ export default function MyApp(props: any) {
   return (
     <BeaUI.ToastProvider>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Caveat:wght@500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Caveat:wght@500;600;700&display=swap');
         /* Redesign "papel quente": fundo #FBFAF6, tinta #1B1A17, acento índigo #5B45D9 */
         :root, .dark { --primary: 249 66% 56%; --primary-foreground: 0 0% 100%; --ring: 249 66% 56%; --destructive: 343 53% 53%; --destructive-foreground: 0 0% 100%; }
         :root {
@@ -31,8 +31,8 @@ export default function MyApp(props: any) {
         @media (hover: none) and (pointer: coarse) { .touch-show { opacity: 1 !important; } }
         body, button, input, textarea, select { font-family: 'Hanken Grotesk', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
         body { overscroll-behavior-y: none; background-color: hsl(var(--background)); color: hsl(var(--foreground)); -webkit-font-smoothing: antialiased; }
-        /* Títulos com serifa elegante (Newsreader) */
-        .dc-serif { font-family: 'Newsreader', Georgia, 'Times New Roman', serif !important; letter-spacing: -0.01em; }
+        /* Títulos usam a mesma fonte da interface (sem serifa) */
+        .dc-serif { font-family: 'Hanken Grotesk', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important; letter-spacing: -0.015em; }
         .dc-hand { font-family: 'Caveat', ui-rounded, cursive; }
         *::-webkit-scrollbar { width: 11px; height: 11px; }
         *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
@@ -6531,15 +6531,21 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         );
       })()}
 
-      {/* Barra do nó selecionado — tamanho do texto e ações */}
-      {canEdit && effTool === "select" && selNode && multiSel.length <= 1 && !editing && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (
-        <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5">
-          <button onClick={() => startEditNode(selNode)} className={eBtn} title="Editar texto (duplo clique)" type="button">✎ Texto</button>
-          <div className="w-px h-5 bg-border" />
-          {fontStepper()}
-          <div className="w-px h-5 bg-border" />
-          <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋</button>
-          <button onClick={deleteSelected} className={eBtn} title="Excluir (Delete)" type="button">🗑️</button>
+      {/* Barra do nó selecionado — tamanho do texto e ações (também durante a edição) */}
+      {canEdit && effTool === "select" && selNode && multiSel.length <= 1 && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (!editing || (editing.id === selNode.id && !editing.edge)) && (
+        <div onMouseDown={(e) => e.preventDefault()} className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5">
+          {editing ? (
+            fontStepper()
+          ) : (
+            <>
+              <button onClick={() => startEditNode(selNode)} className={eBtn} title="Editar texto (duplo clique)" type="button">✎ Texto</button>
+              <div className="w-px h-5 bg-border" />
+              {fontStepper()}
+              <div className="w-px h-5 bg-border" />
+              <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋</button>
+              <button onClick={deleteSelected} className={eBtn} title="Excluir (Delete)" type="button">🗑️</button>
+            </>
+          )}
         </div>
       )}
 

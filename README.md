@@ -88,8 +88,9 @@ function AppContent({ db, user, files }: any) { ... }
 **Estilo:** classes utilitárias tipo **Tailwind** + um bloco `<style>` no topo.
 Tema "papel quente" (redesign): fundo `#FBFAF6`, tinta `#1B1A17`, acento índigo
 `#5B45D9`, definidos nas variáveis CSS `--background`/`--foreground`/`--primary`
-etc. (claro e escuro). Tipografia: **Hanken Grotesk** (UI) e **Newsreader**
-(títulos, classe `.dc-serif`), via Google Fonts com fallback de sistema.
+etc. (claro e escuro). Tipografia única: **Hanken Grotesk** em toda a interface
+e nos títulos (a classe `.dc-serif` aponta para a mesma fonte, sem serifa), via
+Google Fonts com fallback de sistema.
 Permissão de edição: `user.role === "admin"` ou `"builder"` (`canEdit`).
 
 ### Banco de dados
