@@ -1712,6 +1712,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [pendingShape, setPendingShape] = useState("rect");
   const [paletteIdx, setPaletteIdx] = useState(1);
   const [selected, setSelected] = useState<any>(null); // {type:'node'|'edge', id}
+  const [multiSel, setMultiSel] = useState<string[]>([]); // ids de nós (laço / grupo)
+  const [marquee, setMarquee] = useState<any>(null);
+  const marqueeRef = useRef<any>(null);
   const [editing, setEditing] = useState<any>(null);   // {id, value, edge?}
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
@@ -1897,28 +1900,56 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const startEditNode = (n: any) => { setSelected({ type: "node", id: n.id }); setEditing({ id: n.id, value: n.text || "" }); };
   const startEditEdge = (ed: any) => { setSelected({ type: "edge", id: ed.id }); setEditing({ id: ed.id, edge: true, value: ed.label || "" }); };
 
-  // Copiar / colar / recortar item (Ctrl+C / Ctrl+V / Ctrl+X)
+  // ---- seleção múltipla / grupos ----
+  const groupMembers = (id: string) => {
+    const n = nodeById(id);
+    if (!n) return [] as string[];
+    if (!n.group) return [id];
+    return nodesRef.current.filter((x: any) => x.group === n.group).map((x: any) => x.id);
+  };
+  const selectedNodeIds = (): string[] => (multiSel.length ? multiSel : (selected && selected.type === "node" ? [selected.id] : []));
+  const groupSelected = () => {
+    const ids = selectedNodeIds();
+    if (ids.length < 2) return;
+    const g = uid();
+    commit(nodesRef.current.map((n: any) => (ids.indexOf(n.id) !== -1 ? { ...n, group: g } : n)), edgesRef.current);
+  };
+  const ungroupSelected = () => {
+    const ids = selectedNodeIds();
+    if (!ids.length) return;
+    commit(nodesRef.current.map((n: any) => (ids.indexOf(n.id) !== -1 ? { ...n, group: undefined } : n)), edgesRef.current);
+  };
+
+  // Copiar / colar / recortar (Ctrl+C / Ctrl+V / Ctrl+X) — 1 ou vários
   const copyDiagram = () => {
-    if (!selected || selected.type !== "node") return false;
-    const n = nodeById(selected.id);
-    if (!n) return false;
-    DIAGRAM_CLIP = clone(n);
-    return true;
+    const ids = selectedNodeIds();
+    if (!ids.length) return false;
+    DIAGRAM_CLIP = ids.map((id) => nodeById(id)).filter(Boolean).map((n: any) => clone(n));
+    return DIAGRAM_CLIP.length > 0;
   };
   const pasteDiagram = () => {
-    if (!DIAGRAM_CLIP) return false;
-    const n = { ...clone(DIAGRAM_CLIP), id: uid(), x: (DIAGRAM_CLIP.x || 0) + 32, y: (DIAGRAM_CLIP.y || 0) + 32 };
-    commit([...nodesRef.current, n], edgesRef.current);
-    setSelected({ type: "node", id: n.id });
-    DIAGRAM_CLIP = clone(n); // próxima colagem segue em cascata
+    if (!DIAGRAM_CLIP || !DIAGRAM_CLIP.length) return false;
+    const gmap: any = {};
+    const copies = DIAGRAM_CLIP.map((n: any) => {
+      const c = { ...clone(n), id: uid(), x: (n.x || 0) + 32, y: (n.y || 0) + 32 };
+      if (c.group) { if (!gmap[c.group]) gmap[c.group] = uid(); c.group = gmap[c.group]; }
+      return c;
+    });
+    commit([...nodesRef.current, ...copies], edgesRef.current);
+    if (copies.length > 1) { setMultiSel(copies.map((c: any) => c.id)); setSelected({ type: "node", id: copies[0].id }); }
+    else { setSelected({ type: "node", id: copies[0].id }); setMultiSel([]); }
+    DIAGRAM_CLIP = copies.map((c: any) => clone(c)); // colagem em cascata
     return true;
   };
 
   const deleteSelected = () => {
-    if (!selected) return;
-    if (selected.type === "node") {
-      commit(nodesRef.current.filter((n: any) => n.id !== selected.id), edgesRef.current.filter((e: any) => e.from !== selected.id && e.to !== selected.id));
-    } else {
+    const ids = selectedNodeIds();
+    if (ids.length) {
+      commit(nodesRef.current.filter((n: any) => ids.indexOf(n.id) === -1), edgesRef.current.filter((e: any) => ids.indexOf(e.from) === -1 && ids.indexOf(e.to) === -1));
+      setSelected(null); setMultiSel([]);
+      return;
+    }
+    if (selected && selected.type === "edge") {
       commit(nodesRef.current, edgesRef.current.filter((e: any) => e.id !== selected.id));
     }
     setSelected(null);
@@ -2005,13 +2036,15 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       if (meta && e.key.toLowerCase() === "c") { if (copyDiagram()) e.preventDefault(); return; }
       if (meta && e.key.toLowerCase() === "x") { if (copyDiagram()) { e.preventDefault(); deleteSelected(); } return; }
       if (meta && e.key.toLowerCase() === "v") { if (pasteDiagram()) e.preventDefault(); return; }
-      if ((e.key === "Delete" || e.key === "Backspace") && selected) { e.preventDefault(); deleteSelected(); return; }
-      if (e.key === "Escape") { setSelected(null); setShapePanel(false); return; }
+      if (meta && e.key.toLowerCase() === "g" && !e.shiftKey) { e.preventDefault(); groupSelected(); return; }
+      if (meta && (e.key.toLowerCase() === "g" && e.shiftKey)) { e.preventDefault(); ungroupSelected(); return; }
+      if ((e.key === "Delete" || e.key === "Backspace") && (selected || multiSel.length)) { e.preventDefault(); deleteSelected(); return; }
+      if (e.key === "Escape") { setSelected(null); setMultiSel([]); setShapePanel(false); return; }
       if (e.key === "Enter" && selected && selected.type === "node") { e.preventDefault(); const n = nodeById(selected.id); if (n) startEditNode(n); return; }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, canEdit, past, future]);
+  }, [selected, multiSel, canEdit, past, future]);
 
   const effTool = canEdit ? tool : "pan";
 
@@ -2059,8 +2092,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       }
     }
 
-    // alças de redimensionamento
-    if (canEdit && selected && selected.type === "node") {
+    // alças de redimensionamento (só com 1 nó selecionado)
+    if (canEdit && selected && selected.type === "node" && multiSel.length <= 1) {
       const n = nodeById(selected.id);
       if (n) {
         const corners = [
@@ -2086,22 +2119,30 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         if (hit) { gestureRef.current = { kind: "connect", fromId: n.id }; setEdgeDraft({ fromId: n.id, x: p.x, y: p.y, targetId: null }); return; }
       }
     }
-    // corpo do nó → selecionar/arrastar
+    // corpo do nó → selecionar/arrastar (grupo e multi-seleção movem juntos)
     const hn = nodeUnder(p);
     if (hn) {
+      let ids: string[];
+      if (multiSel.length && multiSel.indexOf(hn.id) !== -1) ids = multiSel;
+      else { const mem = groupMembers(hn.id); if (mem.length > 1) { ids = mem; setMultiSel(mem); } else { ids = [hn.id]; setMultiSel([]); } }
       setSelected({ type: "node", id: hn.id });
-      if (canEdit) gestureRef.current = { kind: "drag", id: hn.id, p0: p, base: { x: hn.x, y: hn.y }, moved: false, snap: snap() };
+      if (canEdit) {
+        const base = ids.map((id) => { const nn = nodeById(id); return { id, x: nn.x, y: nn.y }; });
+        gestureRef.current = { kind: "drag", ids, p0: p, base, moved: false, snap: snap() };
+      }
       return;
     }
     // aresta → selecionar
     const he = [...edgesRef.current].reverse().find((ed: any) => edgeHit(ed, p));
-    if (he) { setSelected({ type: "edge", id: he.id }); gestureRef.current = { kind: "none" }; return; }
-    // fundo → mover a tela + limpar seleção
-    setSelected(null);
-    gestureRef.current = { kind: "pan", x: e.clientX, y: e.clientY, tx, ty };
+    if (he) { setSelected({ type: "edge", id: he.id }); setMultiSel([]); gestureRef.current = { kind: "none" }; return; }
+    // fundo → laço de seleção (ferramenta selecionar) ou mover a tela
+    setSelected(null); setMultiSel([]);
+    if (effTool === "select") { marqueeRef.current = { x0: p.x, y0: p.y }; setMarquee({ x: p.x, y: p.y, w: 0, h: 0 }); gestureRef.current = { kind: "marquee" }; }
+    else { gestureRef.current = { kind: "pan", x: e.clientX, y: e.clientY, tx, ty }; }
   };
 
   const moveNodeTo = (id: string, x: number, y: number) => { const ns = nodesRef.current.map((n: any) => (n.id === id ? { ...n, x, y } : n)); nodesRef.current = ns; setNodes(ns); };
+  const moveNodesBy = (base: any[], dx: number, dy: number) => { const ns = nodesRef.current.map((n: any) => { const b = base.find((x: any) => x.id === n.id); return b ? { ...n, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : n; }); nodesRef.current = ns; setNodes(ns); };
   const sizeNode = (id: string, x: number, y: number, w: number, h: number) => { const ns = nodesRef.current.map((n: any) => (n.id === id ? { ...n, x, y, w, h } : n)); nodesRef.current = ns; setNodes(ns); };
 
   const onPointerMove = (e: any) => {
@@ -2131,7 +2172,12 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (g.kind === "drag") {
       const dx = p.x - g.p0.x, dy = p.y - g.p0.y;
       if (Math.abs(dx) + Math.abs(dy) > 1) g.moved = true;
-      moveNodeTo(g.id, Math.round(g.base.x + dx), Math.round(g.base.y + dy));
+      moveNodesBy(g.base, dx, dy);
+      return;
+    }
+    if (g.kind === "marquee") {
+      const m0 = marqueeRef.current;
+      if (m0) setMarquee({ x: Math.min(m0.x0, p.x), y: Math.min(m0.y0, p.y), w: Math.abs(p.x - m0.x0), h: Math.abs(p.y - m0.y0) });
       return;
     }
     if (g.kind === "resize") {
@@ -2185,6 +2231,14 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (g.kind === "drag" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "resize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
+    else if (g.kind === "marquee") {
+      const m = marquee; marqueeRef.current = null; setMarquee(null);
+      if (m && (m.w > 5 || m.h > 5)) {
+        const ids = nodesRef.current.filter((n: any) => n.x < m.x + m.w && n.x + n.w > m.x && n.y < m.y + m.h && n.y + n.h > m.y).map((n: any) => n.id);
+        if (ids.length > 1) { setMultiSel(ids); setSelected({ type: "node", id: ids[0] }); }
+        else if (ids.length === 1) { setMultiSel([]); setSelected({ type: "node", id: ids[0] }); }
+      }
+    }
     else if (g.kind === "connect") {
       const p = getPos(e);
       const tgt = nodeUnder(p);
@@ -2317,8 +2371,25 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               ))}
             </g>
           ) : null))}
+          {/* laço de seleção */}
+          {marquee && (
+            <rect x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="hsl(var(--primary) / 0.08)" stroke="hsl(var(--primary))" strokeWidth={1 / scale} strokeDasharray={(4 / scale) + " " + (3 / scale)} />
+          )}
+          {/* seleção múltipla / grupo */}
+          {canEdit && effTool === "select" && multiSel.length > 1 && (() => {
+            const sel = nodesRef.current.filter((n: any) => multiSel.indexOf(n.id) !== -1);
+            if (!sel.length) return null;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            sel.forEach((n: any) => { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h); });
+            return (
+              <g>
+                {sel.map((n: any) => (<rect key={"ms-" + n.id} x={n.x - 3} y={n.y - 3} width={n.w + 6} height={n.h + 6} rx={6} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.2 / scale} opacity={0.7} />))}
+                <rect x={minX - 8} y={minY - 8} width={maxX - minX + 16} height={maxY - minY + 16} rx={8} fill="hsl(var(--primary) / 0.05)" stroke="hsl(var(--primary))" strokeWidth={1.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} />
+              </g>
+            );
+          })()}
           {/* caixa de seleção do nó */}
-          {selNode && canEdit && effTool === "select" && (
+          {selNode && canEdit && effTool === "select" && multiSel.length <= 1 && (
             <g>
               <rect x={selNode.x - 5} y={selNode.y - 5} width={selNode.w + 10} height={selNode.h + 10} rx={6} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} />
               {[
@@ -2455,6 +2526,28 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         </div>
       )}
 
+      {/* Barra da multi-seleção: agrupar / desagrupar */}
+      {canEdit && effTool === "select" && multiSel.length > 1 && !editing && (() => {
+        const sel = nodesRef.current.filter((n: any) => multiSel.indexOf(n.id) !== -1);
+        const groups = new Set(sel.map((n: any) => n.group || null));
+        const oneGroup = sel.length > 1 && groups.size === 1 && !groups.has(null);
+        return (
+          <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5">
+            {oneGroup ? (
+              <button onClick={ungroupSelected} className="h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-semibold text-primary hover:bg-accent transition-colors" title="Desagrupar (Ctrl+Shift+G)" type="button">⧉ Desagrupar ({sel.length})</button>
+            ) : (
+              <button onClick={groupSelected} className="h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-semibold text-primary hover:bg-accent transition-colors" title="Agrupar — movem juntos (Ctrl+G)" type="button">⧉ Agrupar ({sel.length})</button>
+            )}
+            <div className="w-px h-5 bg-border" />
+            <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋 Duplicar</button>
+            <div className="w-px h-5 bg-border" />
+            <button onClick={deleteSelected} className={eBtn} title="Excluir selecionados (Delete)" type="button">🗑️ Excluir</button>
+            <div className="w-px h-5 bg-border" />
+            <button onClick={() => { setMultiSel([]); setSelected(null); }} className="h-8 px-2 flex items-center rounded-xl text-xs text-muted-foreground hover:bg-accent transition-colors" title="Cancelar seleção" type="button">✕</button>
+          </div>
+        );
+      })()}
+
       {/* Barra da seta selecionada — opções completas */}
       {canEdit && selected && selected.type === "edge" && !editing && (() => {
         const ed = edgesRef.current.find((x: any) => x.id === selected.id);
@@ -2517,7 +2610,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           <div className="text-center text-muted-foreground/50 px-6">
             <div className="text-6xl mb-3">🗺️</div>
             <p className="text-sm font-medium">Clique numa forma à esquerda para começar — ou dê um duplo clique no quadro</p>
-            <p className="text-xs mt-1.5">Arraste pelas bolinhas para conectar (várias setas entre os mesmos itens, indo e voltando, vários→um e um→vários) · selecione a seta para curvar · duplo clique escreve dentro · Ctrl+C/Ctrl+V copia e cola · arraste os cantos para redimensionar · pinça/Ctrl+scroll dá zoom</p>
+            <p className="text-xs mt-1.5">Arraste pelas bolinhas para conectar (várias setas entre os mesmos itens, indo e voltando, vários→um e um→vários) · selecione a seta para curvar · duplo clique escreve dentro · Ctrl+C/Ctrl+V copia e cola · arraste no vazio para laçar vários e Ctrl+G agrupa · arraste os cantos para redimensionar · pinça/Ctrl+scroll dá zoom</p>
           </div>
         </div>
       )}
