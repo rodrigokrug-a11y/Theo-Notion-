@@ -5635,6 +5635,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (!selected || selected.type !== "edge") return;
     commit(nodesRef.current, edgesRef.current.map((e: any) => (e.id === selected.id ? { ...e, ...(typeof patch === "function" ? patch(e) : patch) } : e)));
   };
+  // Tamanho da fonte do texto dos nós selecionados (1 ou vários)
+  const setSelectedFont = (size: number) => {
+    const ids = selectedNodeIds();
+    if (!ids.length) return;
+    const s = Math.max(8, Math.min(96, Math.round(size)));
+    commit(nodesRef.current.map((n: any) => (ids.indexOf(n.id) !== -1 ? { ...n, fontSize: s } : n)), edgesRef.current);
+  };
+  const bumpSelectedFont = (d: number) => {
+    const ids = selectedNodeIds();
+    if (!ids.length) return;
+    const cur = (nodeById(ids[0]) || {}).fontSize || 15;
+    setSelectedFont(cur + d);
+  };
 
   const zoomBy = (factor: number) => {
     const r = svgRef.current?.getBoundingClientRect();
@@ -6224,6 +6237,20 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
   const tBtn = (active: boolean) => "h-10 w-10 flex items-center justify-center rounded-full transition-all text-lg leading-none " + (active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-105" : "text-muted-foreground hover:bg-accent hover:text-foreground");
   const eBtn = "h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors";
+  // Controle de tamanho do texto dos nós (A− / valor / A+)
+  const fontStepper = () => {
+    const ids = selectedNodeIds();
+    const cur = (nodeById(ids[0]) || {}).fontSize || 15;
+    const fb = "h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors font-bold";
+    return (
+      <div className="flex items-center gap-0.5" title="Tamanho do texto">
+        <span className="text-[11px] font-semibold text-muted-foreground/70 px-0.5">Aa</span>
+        <button onClick={() => bumpSelectedFont(-2)} className={fb + " text-base"} title="Diminuir texto" type="button">−</button>
+        <span className="min-w-[1.7rem] text-center text-xs font-semibold text-foreground tabular-nums">{cur}</span>
+        <button onClick={() => bumpSelectedFont(2)} className={fb + " text-lg"} title="Aumentar texto" type="button">+</button>
+      </div>
+    );
+  };
 
   return (
     <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
@@ -6493,6 +6520,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               <button onClick={groupSelected} className="h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-semibold text-primary hover:bg-accent transition-colors" title="Agrupar — movem juntos (Ctrl+G)" type="button">⧉ Agrupar ({sel.length})</button>
             )}
             <div className="w-px h-5 bg-border" />
+            {fontStepper()}
+            <div className="w-px h-5 bg-border" />
             <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋 Duplicar</button>
             <div className="w-px h-5 bg-border" />
             <button onClick={deleteSelected} className={eBtn} title="Excluir selecionados (Delete)" type="button">🗑️ Excluir</button>
@@ -6501,6 +6530,18 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           </div>
         );
       })()}
+
+      {/* Barra do nó selecionado — tamanho do texto e ações */}
+      {canEdit && effTool === "select" && selNode && multiSel.length <= 1 && !editing && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (
+        <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-border/70 shadow-lg p-1 flex items-center gap-0.5">
+          <button onClick={() => startEditNode(selNode)} className={eBtn} title="Editar texto (duplo clique)" type="button">✎ Texto</button>
+          <div className="w-px h-5 bg-border" />
+          {fontStepper()}
+          <div className="w-px h-5 bg-border" />
+          <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋</button>
+          <button onClick={deleteSelected} className={eBtn} title="Excluir (Delete)" type="button">🗑️</button>
+        </div>
+      )}
 
       {/* Barra da seta selecionada — opções completas */}
       {canEdit && selected && selected.type === "edge" && !editing && (() => {
