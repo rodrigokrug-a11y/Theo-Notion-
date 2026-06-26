@@ -5391,6 +5391,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const editRef = useRef<any>(null);
   const pointersRef = useRef<Map<number, any>>(new Map());
   const pinchRef = useRef<any>(null);
+  const tapRef = useRef<any>(null); // detecção de toque-duplo (iPad não dispara dblclick)
   const pastRef = useRef<any[]>([]);
   const futureRef = useRef<any[]>([]);
 
@@ -6154,6 +6155,29 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         setSelected({ type: "edge", id: ne.id });
       }
       setEdgeDraft(null);
+    }
+
+    // Toque-duplo (touch/caneta) para editar — o iPad não dispara onDoubleClick com touch-action:none
+    if (e.pointerType !== "mouse" && canEdit && !drawShape) {
+      const moved = (g.kind === "drag" && g.moved) || (g.kind === "resize" && g.moved) || (g.kind === "lineend" && g.moved) ||
+        g.kind === "pan" || g.kind === "connect" || g.kind === "drawline" ||
+        ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved);
+      if (!moved) {
+        const p = getPos(e);
+        const now = Date.now();
+        const last = tapRef.current;
+        const near = last && Math.hypot(p.x - last.x, p.y - last.y) < 26 / scale;
+        if (last && near && now - last.t < 380) {
+          tapRef.current = null;
+          const hn = nodeUnder(p);
+          if (hn) { startEditNode(hn); return; }
+          const he = [...edgesRef.current].reverse().find((ed: any) => edgeHit(ed, p));
+          if (he) { startEditEdge(he); return; }
+          addNodeAt(pendingShape, p);
+          return;
+        }
+        tapRef.current = { x: p.x, y: p.y, t: now };
+      }
     }
   };
 
