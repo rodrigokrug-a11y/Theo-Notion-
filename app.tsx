@@ -5405,6 +5405,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const pinchRef = useRef<any>(null);
   const tapRef = useRef<any>(null); // detecção de toque-duplo (iPad não dispara dblclick)
   const tapDownRef = useRef<any>(null); // posição/tempo do toque para distinguir toque de arraste
+  const editTaRef = useRef<HTMLTextAreaElement | null>(null); // campo de edição persistente (foco síncrono p/ teclado no iOS/Chrome)
   const pastRef = useRef<any[]>([]);
   const futureRef = useRef<any[]>([]);
 
@@ -5546,11 +5547,15 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const w = 160, h = isText ? 44 : 80;
     return { id: uid(), shape, x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h, text: "", bg: isText ? "transparent" : pal.bg, color: isText ? "transparent" : pal.border, textColor: isText ? "#0f172a" : pal.text, fontSize: isText ? 18 : 15 };
   };
+  // Foca o campo de edição AGORA (dentro do gesto do usuário) para o teclado
+  // abrir em tamanho normal no iOS/Chrome (foco programático tardio abre reduzido).
+  const focusEdit = () => { try { if (editTaRef.current) editTaRef.current.focus({ preventScroll: true } as any); } catch (e) {} };
   const addNodeAt = (shape: string, p: any) => {
     const n = newNode(shape, p.x, p.y);
     commit([...nodesRef.current, n], edgesRef.current);
     setSelected({ type: "node", id: n.id });
     setEditing({ id: n.id, value: "" });
+    focusEdit();
   };
   const addNode = (shape: string) => {
     const r = svgRef.current?.getBoundingClientRect();
@@ -5577,6 +5582,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     setSelected({ type: "node", id: newN.id });
     setMultiSel([]);
     setEditing({ id: newN.id, value: "" });
+    focusEdit();
   };
   const newLineNode = (shape: string, box: any) => {
     const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
@@ -5597,7 +5603,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     }
   };
 
-  const startEditNode = (n: any) => { setSelected({ type: "node", id: n.id }); setEditing({ id: n.id, value: n.text || "" }); };
+  const startEditNode = (n: any) => { setSelected({ type: "node", id: n.id }); setEditing({ id: n.id, value: n.text || "" }); focusEdit(); };
   const startEditEdge = (ed: any) => { setSelected({ type: "edge", id: ed.id }); setEditing({ id: ed.id, edge: true, value: ed.label || "" }); };
 
   // ---- seleção múltipla / grupos ----
@@ -6432,21 +6438,25 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         </g>
       </svg>
 
-      {/* editor de texto dentro da forma */}
-      {editing && !editing.edge && (() => {
-        const n = nodeById(editing.id);
-        if (!n) return null;
+      {/* editor de texto dentro da forma — campo PERSISTENTE (foco síncrono p/ teclado normal no iOS/Chrome) */}
+      {(() => {
+        const ed = editing && !editing.edge ? editing : null;
+        const n = ed ? nodeById(ed.id) : null;
+        const active = !!(ed && n);
+        const box: any = active
+          ? { left: n.x * scale + tx, top: n.y * scale + ty, width: n.w * scale, height: n.h * scale, opacity: 1 }
+          : { left: 0, top: 0, width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" };
         return (
-          <div className="absolute z-40" style={{ left: n.x * scale + tx, top: n.y * scale + ty, width: n.w * scale, height: n.h * scale }} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="absolute z-40" style={box} onPointerDown={(e) => e.stopPropagation()}>
             <textarea
-              autoFocus
-              value={editing.value}
+              ref={editTaRef}
+              value={ed ? ed.value : ""}
               onChange={(ev) => setEditing((te: any) => (te ? { ...te, value: ev.target.value } : te))}
-              onBlur={commitEditing}
+              onBlur={() => { if (editRef.current) commitEditing(); }}
               onKeyDown={(ev) => { ev.stopPropagation(); if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commitEditing(); } else if (ev.key === "Escape") { ev.preventDefault(); cancelEditing(); } }}
-              placeholder="Escreva..."
+              placeholder={active ? "Escreva..." : ""}
               className="w-full h-full bg-transparent outline-none resize-none text-center placeholder:text-muted-foreground/40"
-              style={{ fontSize: (n.fontSize || 15) * scale + "px", lineHeight: 1.25, color: n.textColor || "#0f172a", fontWeight: 500, padding: "6px 10px", overflow: "hidden" }}
+              style={{ fontSize: ((active ? (n.fontSize || 15) : 15) * scale) + "px", lineHeight: 1.25, color: active ? (n.textColor || "#0f172a") : "transparent", caretColor: active ? (n.textColor || "#0f172a") : "transparent", fontWeight: 500, padding: "6px 10px", overflow: "hidden" }}
             />
           </div>
         );
