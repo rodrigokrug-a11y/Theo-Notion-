@@ -55,6 +55,9 @@ const SLASH_ITEMS = [
   { type: "image", label: "Imagem", desc: "Insira uma imagem", display: "🖼", style: "" },
   { type: "table", label: "Tabela", desc: "Tabela editável", display: "⊞", style: "text-xl leading-none" },
   { type: "sketch", label: "Manuscrito", desc: "Bloco para escrever à mão", display: "✍️", style: "" },
+  { type: "embed_diagram", label: "Diagrama", desc: "Inserir um diagrama (novo ou existente)", display: "🗺️", style: "" },
+  { type: "embed_canvas", label: "Caderno", desc: "Inserir um caderno de desenho", display: "🎨", style: "" },
+  { type: "mermaid", label: "Diagrama por texto (Mermaid)", desc: "Escreva e vire fluxograma", display: "🧜", style: "" },
 ];
 
 const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😕 🙁 😣 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🤭 🤫 🤥 😶 😐 😑 😬 🙄 😯 😲 🥱 😴 🤤 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👻 💀 👽 👾 🤖 🎃 🤲 👐 🙌 👏 🤝 👍 👎 👊 ✊ 👌 ✋ 👋 🤙 💪 🦾 🙏 👁 👀 🧠 🗣 👤 👥 👶 👧 🧒 👦 👩 🧑 👨 👵 🧓 👴 🧕 👮 👷 💂 🕵 👰 🤵 👸 🤴 🦸 🦹 🧙 🧝 🧛 🧟 🧞 🧜 🧚 👼 🤰 💃 🕺 🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🐣 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🐘 🦏 🐪 🦒 🐃 🐂 🐄 🐎 🐖 🐑 🦙 🐐 🦌 🐕 🐈 🐓 🦃 🦚 🦜 🐇 🐉 🐲 🌵 🎄 🌲 🌳 🌴 🌱 🌿 🍀 🍃 🍂 🍁 🍄 🌾 💐 🌷 🌹 🌺 🌸 🌼 🌻 🌞 🌝 🌜 🌙 🌎 🌍 🌏 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☀️ ☁️ ❄️ ☃️ ⛄ 💨 💧 💦 🌊 🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥒 🌶 🌽 🥕 🥔 🍠 🥐 🍞 🥖 🥨 🧀 🥚 🍳 🥞 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🥪 🌮 🌯 🥗 🍝 🍜 🍲 🍛 🍣 🍱 🍤 🍙 🍚 🍘 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 🌰 🍯 🥛 🍼 ☕ 🍵 🥤 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🍾 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🏉 🎱 🏓 🏸 🥅 ⛳ 🏹 🎣 🥊 🥋 🛹 🎿 ⛷ 🏂 🏆 🥇 🥈 🥉 🏅 🎖 🎫 🎟 🎪 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎲 🎯 🎳 🎮 🚗 🚕 🚙 🚌 🚎 🏎 🚓 🚑 🚒 🚐 🚚 🚛 🚜 🛵 🏍 🚨 🚔 🚍 🚘 🚖 🚲 🛴 🚀 🛸 🚁 ✈️ 🚂 🚆 🚇 🚊 🚉 🛳 ⛵ 🚢 ⚓ 🚧 🚦 🗺 🗽 🏰 🏯 🏟 🎡 🎢 🎠 🏖 🏝 🏜 🌋 🏔 🗻 🏕 🏠 🏡 🏘 🏗 🏭 🏢 🏬 🏥 🏦 🏨 🏪 🏫 🏩 🏛 ⛪ 🕌 🕍 🌅 🌄 🌠 🌇 🌆 🏙 🌃 🌌 🌉 🌁 ⌚ 📱 💻 🖥 🖨 🖱 💾 💿 📷 📹 🎥 📞 ☎ 📺 📻 🔋 🔌 💡 🔦 🕯 💵 💴 💶 💷 💰 💳 💎 🔧 🔨 🛠 🔩 ⚙ 🧱 🔫 💣 🔪 🛡 🔮 📿 🔬 🔭 🩺 💊 💉 🧬 🧪 🌡 🧹 🚽 🚿 🛁 🧼 🛎 🔑 🚪 🛏 🛋 🧸 🛍 🛒 🎁 🎈 🎀 🎊 🎉 🎎 🏮 🧧 ✉ 📩 📨 📧 📥 📤 📦 📪 📫 📬 📮 📯 📜 📄 📑 🧾 📊 📈 📉 🗒 🗓 📆 📅 🗑 📁 📂 🗂 🗞 📰 📓 📔 📒 📕 📗 📘 📙 📚 📖 🔖 📎 📐 📏 📌 📍 ✂ 🖊 🖋 🖌 🖍 📝 ✏ 🔍 🔎 🔏 🔐 🔒 🔓".split(" ");
@@ -847,6 +850,24 @@ function AppContent({ db, user, files }: any) {
     }
   };
 
+  // Cria um diagrama/caderno como subpágina SEM navegar — para incorporar em blocos
+  const createEmbeddedPage = async (parentId: string | null, kind: "diagram" | "canvas"): Promise<string | null> => {
+    if (!canEdit) return null;
+    try {
+      const siblings = (Array.isArray(pages)?pages:[]).filter((p) => p.parent_id === parentId && !p.deleted_at);
+      const isDiagram = kind === "diagram";
+      const content = isDiagram ? [{ id: uid(), type: "diagram", nodes: [], edges: [] }] : [{ id: uid(), type: "canvas", paper: "lines", bg: "transparent", els: [] }];
+      const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, content, sort_order) VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *", [user.id, parentId, isDiagram ? "Novo diagrama" : "Novo caderno", isDiagram ? "🗺️" : "🎨", JSON.stringify(content), siblings.length]);
+      const np = parseRows(r)[0];
+      setPages((prev) => [...prev, np]);
+      if (parentId) setExpanded((e) => ({ ...e, [parentId]: true }));
+      return np.id;
+    } catch (e: any) {
+      toast("Erro ao criar: " + e.message, "error");
+      return null;
+    }
+  };
+
   const flushSavesNow = async () => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     const changes = pendingChanges.current;
@@ -1113,6 +1134,7 @@ function AppContent({ db, user, files }: any) {
                 showCoverPicker={showCoverPicker} setShowCoverPicker={setShowCoverPicker}
                 showColorPicker={showColorPicker} setShowColorPicker={setShowColorPicker}
                 onSelectPage={(id: string) => setActiveId(id)} onCreateSubpage={() => createPage(activePage.id)}
+                onCreateEmbed={(kind: "diagram" | "canvas") => createEmbeddedPage(activePage.id, kind)}
               />
             )
           ) : (
@@ -1484,7 +1506,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
   );
 }
 
-function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, setShowIconPicker, showCoverPicker, setShowCoverPicker, showColorPicker, setShowColorPicker, onSelectPage, onCreateSubpage }: any) {
+function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, setShowIconPicker, showCoverPicker, setShowCoverPicker, showColorPicker, setShowColorPicker, onSelectPage, onCreateSubpage, onCreateEmbed }: any) {
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const [title, setTitle] = useState(page.title || "");
 
@@ -1541,7 +1563,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           className="w-full bg-transparent font-bold outline-none resize-none border-0 p-0 mb-4 block text-foreground placeholder:text-muted-foreground/50"
           style={{ fontSize: "44px", lineHeight: "1.2", minHeight: "60px", fontFamily: "inherit" }}
         />
-        <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} />
+        <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} />
 
         <div className="mt-12 pt-5 border-t border-border/60">
           <div className="flex items-center justify-between mb-3">
@@ -4391,7 +4413,7 @@ function FormatToolbar() {
   );
 }
 
-function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage }: any) {
+function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed }: any) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [slash, setSlash] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
   const [mention, setMention] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
@@ -4453,9 +4475,12 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage }:
     if (type === "table") patch.rows = [["", "", ""], ["", "", ""], ["", "", ""]];
     if (type === "sketch") { patch.h = 220; patch.els = []; patch.html = ""; }
     if (type === "toggle") { patch.open = false; patch.children = [newBlock()]; }
+    if (type === "embed_diagram" || type === "embed_canvas") { patch.type = "pageref"; patch.refKind = type === "embed_diagram" ? "diagram" : "canvas"; patch.pageId = null; patch.html = ""; }
+    if (type === "mermaid") { patch.html = "graph TD\n  A[Início] --> B{Decisão}\n  B -->|Sim| C[Faz isso]\n  B -->|Não| D[Faz aquilo]"; }
+    const realType = patch.type || type;
     const next = [...list]; next[idx] = { ...cur, ...patch };
 
-    if (type === "divider" || type === "sketch") {
+    if (realType === "divider" || realType === "sketch") {
       const nb = newBlock("paragraph");
       next.splice(idx + 1, 0, nb);
       onChange(next); setSlash(null); setFocusId(nb.id);
@@ -4615,7 +4640,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage }:
               onConvert={(type: string, q?: string) => convertBlock(block.id, type, q)}
               onInsertAfter={(type = "paragraph") => insertAfter(block.id, newBlock(type))}
               onPasteBlocks={(before: string, after: string, mdBlocks: any[]) => handlePasteBlocks(block.id, before, after, mdBlocks)}
-              onSelectPage={onSelectPage} pages={pages}
+              onSelectPage={onSelectPage} pages={pages} onCreateEmbed={onCreateEmbed}
               onIndent={() => indentBlock(block.id)}
               onOutdent={() => outdentBlock(block.id)}
               canEdit={canEdit} files={files} listIndex={i} allBlocks={list}
@@ -4804,6 +4829,258 @@ function SketchBlock({ block, onUpdate, onBackspace, canEdit }: any) {
   );
 }
 
+// ========================================================================
+// Incorporar diagrama/caderno em páginas (prévia clicável) + Mermaid
+// ========================================================================
+function dgCenter(n: any) { return { x: n.x + n.w / 2, y: n.y + n.h / 2 }; }
+function dgBorderPoint(n: any, tx2: number, ty2: number) {
+  const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+  const dx = tx2 - cx, dy = ty2 - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy };
+  const hw = n.w / 2, hh = n.h / 2;
+  const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
+  const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return { x: cx + dx * s, y: cy + dy * s };
+}
+function dgAutoCurve(ed: any, edges: any[]) {
+  const key = (e: any) => (e.from < e.to ? e.from + "|" + e.to : e.to + "|" + e.from);
+  const k = key(ed);
+  const group = edges.filter((e: any) => key(e) === k);
+  if (group.length <= 1) return 0;
+  const i = group.findIndex((e: any) => e.id === ed.id);
+  return (i - (group.length - 1) / 2) * 52;
+}
+function dgEdgeGeom(ed: any, nodes: any[], edges: any[]) {
+  const a = nodes.find((n: any) => n.id === ed.from), b = nodes.find((n: any) => n.id === ed.to);
+  if (!a || !b) return null;
+  const ca = dgCenter(a), cb = dgCenter(b);
+  const lowFirst = ed.from < ed.to;
+  const A0 = lowFirst ? ca : cb, B0 = lowFirst ? cb : ca;
+  const vx = B0.x - A0.x, vy = B0.y - A0.y, vl = Math.hypot(vx, vy) || 1;
+  const nx = -vy / vl, ny = vx / vl;
+  const cv = ed.curve != null ? ed.curve : dgAutoCurve(ed, edges);
+  let p1 = dgBorderPoint(a, cb.x, cb.y), p2 = dgBorderPoint(b, ca.x, ca.y);
+  if (cv) {
+    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    const cp = { x: mx + nx * cv, y: my + ny * cv };
+    p1 = dgBorderPoint(a, cp.x, cp.y); p2 = dgBorderPoint(b, cp.x, cp.y);
+    return { p1, p2, cp, cv };
+  }
+  return { p1, p2, cp: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, cv: 0 };
+}
+
+function DiagramPreview({ content }: any) {
+  const block = (Array.isArray(content) && content[0]) || {};
+  const nodes = Array.isArray(block.nodes) ? block.nodes : [];
+  const edges = Array.isArray(block.edges) ? block.edges : [];
+  if (!nodes.length) return <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground italic">Diagrama vazio — clique para editar</div>;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach((n: any) => { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h); });
+  const pad = 60;
+  const vbx = minX - pad, vby = minY - pad, vbw = Math.max(1, maxX - minX + pad * 2), vbh = Math.max(1, maxY - minY + pad * 2);
+  return (
+    <svg viewBox={vbx + " " + vby + " " + vbw + " " + vbh} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "100%", display: "block" }}>
+      {(Array.isArray(edges) ? edges : []).map((ed: any) => {
+        const g = dgEdgeGeom(ed, nodes, edges);
+        if (!g) return null;
+        const col = ed.color || "#64748b";
+        const sw = ed.sw || 2;
+        const hsz = sw * 4 + 3;
+        const dash = ed.style === "dashed" ? (sw * 3) + " " + (sw * 2.5) : ed.style === "dotted" ? (Math.max(0.4, sw * 0.1)) + " " + (sw * 2.2) : undefined;
+        const endTan = g.cv ? g.cp : g.p1, startTan = g.cv ? g.cp : g.p2;
+        const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
+        const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
+        const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+        return (
+          <g key={ed.id}>
+            <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={dash} />
+            {ah && <polygon points={ah.poly} fill={col} />}
+            {sh && <polygon points={sh.poly} fill={col} />}
+          </g>
+        );
+      })}
+      {(Array.isArray(nodes) ? nodes : []).map((n: any) => {
+        const fill = n.bg && n.bg !== "transparent" ? n.bg : "transparent";
+        const stroke = n.color && n.color !== "transparent" ? n.color : "transparent";
+        let shape: any = null;
+        if (n.shape === "rect") shape = <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={2} />;
+        else if (n.shape === "ellipse") shape = <ellipse cx={n.x + n.w / 2} cy={n.y + n.h / 2} rx={Math.max(1, n.w / 2)} ry={Math.max(1, n.h / 2)} fill={fill} stroke={stroke} strokeWidth={2} />;
+        else if (n.shape === "triangle") shape = <polygon points={(n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)} fill={fill} stroke={stroke} strokeWidth={2} strokeLinejoin="round" />;
+        else if (n.shape !== "text") shape = <polygon points={shapePoints({ kind: n.shape, x: n.x, y: n.y, w: n.w, h: n.h })} fill={fill} stroke={stroke} strokeWidth={2} strokeLinejoin="round" />;
+        return (
+          <g key={n.id}>
+            {shape}
+            <foreignObject x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)}>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>{n.text}</div>
+            </foreignObject>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function CanvasPreview({ content }: any) {
+  const block = (Array.isArray(content) && content[0]) || {};
+  const els = Array.isArray(block.els) ? block.els : [];
+  if (!els.length) return <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground italic">Caderno vazio — clique para editar</div>;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  els.forEach((el: any) => { const b = canvasBBox(el); minX = Math.min(minX, b.x); minY = Math.min(minY, b.y); maxX = Math.max(maxX, b.x + b.w); maxY = Math.max(maxY, b.y + b.h); });
+  const pad = 24;
+  const vbx = minX - pad, vby = minY - pad, vbw = Math.max(1, maxX - minX + pad * 2), vbh = Math.max(1, maxY - minY + pad * 2);
+  const bgFill = block.bg && block.bg !== "transparent" ? block.bg : (block.paper === "blueprint" ? BLUEPRINT_BLUE : "transparent");
+  const inner = (bgFill !== "transparent" ? '<rect x="' + vbx + '" y="' + vby + '" width="' + vbw + '" height="' + vbh + '" fill="' + bgFill + '"/>' : "") + (Array.isArray(els) ? els : []).map(elToSvgStringR).join("");
+  return <svg viewBox={vbx + " " + vby + " " + vbw + " " + vbh} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "100%", display: "block" }} dangerouslySetInnerHTML={{ __html: inner }} />;
+}
+
+function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPage, onCreateEmbed, autoFocus, onAutoFocused }: any) {
+  useEffect(() => { if (autoFocus) onAutoFocused(); }, [autoFocus]);
+  const [busy, setBusy] = useState(false);
+  const refKind = block.refKind === "canvas" ? "canvas" : "diagram";
+  const labelKind = refKind === "diagram" ? "diagrama" : "caderno";
+  const iconKind = refKind === "diagram" ? "🗺️" : "🎨";
+  const page = (Array.isArray(pages) ? pages : []).find((p: any) => p.id === block.pageId && !p.deleted_at);
+  const list = (Array.isArray(pages) ? pages : []).filter((p: any) => !p.deleted_at && (refKind === "diagram" ? isDiagramPage(p) : isCanvasPage(p)));
+
+  if (!page) {
+    return (
+      <div className="my-2 rounded-xl border-2 border-dashed border-border bg-muted/20 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-base">{iconKind}</span>
+          <span className="text-sm font-medium text-foreground">Inserir {labelKind}</span>
+          {canEdit && <button onClick={onBackspace} className="ml-auto text-xs text-muted-foreground hover:text-foreground" type="button">remover bloco</button>}
+        </div>
+        {!canEdit ? (
+          <div className="text-xs text-muted-foreground italic">Nada selecionado.</div>
+        ) : (
+          <>
+            {onCreateEmbed && (
+              <button disabled={busy} onClick={async () => { setBusy(true); try { const id = await onCreateEmbed(refKind); if (id) onUpdate({ pageId: id }); } finally { setBusy(false); } }} className="w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-2 disabled:opacity-50" type="button"><span>➕</span>{busy ? "Criando..." : "Criar novo " + labelKind}</button>
+            )}
+            {list.length > 0 && <div className="text-[11px] text-muted-foreground mt-3 mb-1">Ou escolher um existente:</div>}
+            <div className="max-h-44 overflow-y-auto flex flex-col gap-1">
+              {(Array.isArray(list) ? list : []).map((p: any) => (
+                <button key={p.id} onClick={() => onUpdate({ pageId: p.id })} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:bg-accent transition-colors text-left text-sm" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
+                  <span className="text-base shrink-0">{p.icon}</span>
+                  <span className="truncate flex-1 text-foreground">{p.title || "Sem título"}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-2 rounded-xl border-2 border-border overflow-hidden shadow-sm group/embed" style={{ backgroundColor: "hsl(var(--card))" }}>
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/40">
+        <span className="text-sm shrink-0">{page.icon}</span>
+        <span className="text-sm font-medium text-foreground truncate flex-1">{page.title || "Sem título"}</span>
+        <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{refKind === "diagram" ? "🗺️ Diagrama" : "🎨 Caderno"}</span>
+        <button onClick={() => onSelectPage(page.id)} className="shrink-0 text-xs font-semibold text-primary hover:underline" type="button">Abrir ›</button>
+        {canEdit && <button onClick={() => onUpdate({ pageId: null })} className="shrink-0 text-xs text-muted-foreground hover:text-foreground" title="Trocar" type="button">Trocar</button>}
+        {canEdit && <button onClick={onBackspace} className="shrink-0 text-xs text-muted-foreground hover:text-foreground" title="Remover bloco" type="button">🗑️</button>}
+      </div>
+      <button onClick={() => onSelectPage(page.id)} className="block w-full text-left cursor-pointer" title="Abrir para editar" type="button">
+        <div className="w-full overflow-hidden" style={{ height: 280, backgroundColor: "hsl(var(--muted) / 0.25)" }}>
+          {refKind === "diagram" ? <DiagramPreview content={page.content} /> : <CanvasPreview content={page.content} />}
+        </div>
+      </button>
+    </div>
+  );
+}
+
+const MERMAID_URLS = [
+  "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js",
+  "https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js",
+];
+let mermaidPromise: Promise<any> | null = null;
+function ensureMermaid() {
+  if ((window as any).mermaid) return Promise.resolve((window as any).mermaid);
+  if (mermaidPromise) return mermaidPromise;
+  mermaidPromise = (async () => {
+    let lastErr: any = null;
+    for (const u of MERMAID_URLS) {
+      try {
+        await loadScriptOnce(u);
+        const lib = (window as any).mermaid;
+        if (lib) { try { lib.initialize({ startOnLoad: false, securityLevel: "loose", theme: "default" }); } catch (e) {} return lib; }
+      } catch (e) { lastErr = e; }
+    }
+    mermaidPromise = null;
+    throw lastErr || new Error("mermaid indisponível");
+  })();
+  return mermaidPromise;
+}
+
+function MermaidBlock({ block, onUpdate, onBackspace, autoFocus, onAutoFocused, canEdit }: any) {
+  const [editing, setEditing] = useState(false);
+  const [svg, setSvg] = useState<string>("");
+  const [err, setErr] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const seqRef = useRef(0);
+  useEffect(() => { if (autoFocus) { onAutoFocused(); setEditing(true); } }, [autoFocus]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const code = (block.html || "").trim();
+    if (!code) { setSvg(""); setErr(""); setLoading(false); return; }
+    setLoading(true);
+    const t = setTimeout(() => {
+      ensureMermaid().then(async (m) => {
+        try {
+          const rid = "mmd" + String(block.id || "x").replace(/[^a-zA-Z0-9]/g, "") + "_" + (seqRef.current++);
+          const out = await m.render(rid, code);
+          if (!cancelled) { setSvg(out && out.svg ? out.svg : ""); setErr(""); }
+        } catch (e: any) {
+          if (!cancelled) { setErr((e && e.message ? e.message : "Erro de sintaxe no Mermaid").split("\n")[0]); }
+        } finally { if (!cancelled) setLoading(false); }
+      }).catch(() => { if (!cancelled) { setErr("Não consegui carregar o Mermaid (rede bloqueada)."); setLoading(false); } });
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [block.html, block.id]);
+
+  const showEditor = canEdit && (editing || (!svg && !loading && !err));
+
+  return (
+    <div className="my-2 rounded-xl border-2 border-border overflow-hidden bg-card">
+      {canEdit && (
+        <div className="flex items-center gap-1 px-2 py-1 border-b border-border/50 bg-muted/40">
+          <span className="text-sm">🧜</span>
+          <span className="text-xs font-medium text-foreground">Mermaid</span>
+          <a href="https://mermaid.js.org/intro/syntax-reference.html" target="_blank" rel="noopener" className="text-[10px] text-muted-foreground hover:text-foreground underline ml-1">sintaxe</a>
+          <div className="flex-1" />
+          <button onClick={() => setEditing((v) => !v)} className="h-7 px-2 rounded-md text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" type="button">{showEditor ? "Pré-visualizar" : "Editar código"}</button>
+          <button onClick={() => onBackspace && onBackspace()} className="h-7 w-7 flex items-center justify-center rounded-md text-xs text-muted-foreground hover:bg-accent" title="Remover bloco" type="button">✕</button>
+        </div>
+      )}
+      {showEditor && (
+        <textarea
+          defaultValue={block.html || ""}
+          onChange={(e) => onUpdate({ html: e.target.value })}
+          placeholder={"graph TD\n  A[Início] --> B{Decisão}\n  B -->|Sim| C[Faz isso]\n  B -->|Não| D[Faz aquilo]"}
+          spellCheck={false}
+          className="w-full px-3 py-2 bg-muted/30 text-sm font-mono text-foreground outline-none resize-y min-h-[120px] border-b border-border/50"
+        />
+      )}
+      <div className="p-3 overflow-x-auto flex items-center justify-center min-h-[64px]">
+        {loading ? (
+          <span className="text-xs text-muted-foreground inline-flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />Renderizando…</span>
+        ) : err ? (
+          <span className="text-xs text-destructive text-center">⚠ {err}</span>
+        ) : svg ? (
+          <div className="w-full flex justify-center [&_svg]:max-w-full [&_svg]:h-auto" dangerouslySetInnerHTML={{ __html: svg }} />
+        ) : (
+          <span className="text-xs text-muted-foreground italic">Escreva o código acima para gerar o diagrama</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BlockRenderer(props: any) {
   const { block } = props;
   switch (block.type) {
@@ -4816,6 +5093,8 @@ function BlockRenderer(props: any) {
     case "table": return <TableBlock {...props} />;
     case "divider": return <DividerBlock {...props} />;
     case "sketch": return <SketchBlock {...props} />;
+    case "pageref": return <PageRefBlock {...props} />;
+    case "mermaid": return <MermaidBlock {...props} />;
     default: return <TextBlock {...props} />;
   }
 }
@@ -5215,7 +5494,7 @@ function TableBlock({ block, onUpdate, canEdit, autoFocus, onAutoFocused }: any)
   );
 }
 
-function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBackspace, onSlashOpen, onSlashClose, onMentionOpen, onMentionClose, onSelectPage, onPasteBlocks, canEdit, files, pages }: any) {
+function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBackspace, onSlashOpen, onSlashClose, onMentionOpen, onMentionClose, onSelectPage, onPasteBlocks, canEdit, files, pages, onCreateEmbed }: any) {
   const ref = useEditable(block, autoFocus, onAutoFocused);
 
   const onInput = (e: any) => {
@@ -5267,7 +5546,7 @@ function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBac
       </div>
       {block.open && (
         <div className="ml-6 pl-3 border-l-2 border-border">
-          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} />
+          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} />
         </div>
       )}
     </div>
