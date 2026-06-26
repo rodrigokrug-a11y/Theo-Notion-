@@ -65,21 +65,259 @@ const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉
 // ========================================================================
 // Ícones planos (Flaticon UIcons) — base alternativa aos emojis para páginas
 // ========================================================================
-const isUicon = (s: any) => typeof s === "string" && (s.indexOf("ri-") === 0 || s.indexOf("fi-") === 0);
+// Conjunto de ícones planos embutidos (SVG monocromático, usa currentColor).
+const ICON_SVGS: Record<string, string> = {
+  "home": '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  "file": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>',
+  "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+  "folder": '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  "folder-open": '<path d="M6 14l1.5-2.5h10L22 14"/><path d="M2 19a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v3"/>',
+  "edit": '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+  "trash": '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+  "copy": '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  "save": '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+  "search": '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  "user": '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  "users": '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  "heart": '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  "star": '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  "bookmark": '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  "flag": '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+  "tag": '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  "bell": '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  "calendar": '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  "mail": '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 6 12 13 2 6"/>',
+  "message": '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  "phone": '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  "send": '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  "camera": '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  "image": '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  "video": '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
+  "music": '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  "play": '<polygon points="5 3 19 12 5 21 5 3"/>',
+  "headphones": '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>',
+  "mic": '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+  "book": '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  "book-open": '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  "pen": '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>',
+  "brush": '<path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>',
+  "lightbulb": '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>',
+  "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  "trophy": '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>',
+  "crown": '<path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/><line x1="5" y1="20" x2="19" y2="20"/>',
+  "gift": '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  "fire": '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  "rocket": '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91 0z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+  "map-pin": '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  "map": '<polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>',
+  "compass": '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  "globe": '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  "plane": '<path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  "car": '<path d="M5 17H3a1 1 0 0 1-1-1v-3.28a1 1 0 0 1 .684-.948l1.923-.641a1 1 0 0 0 .578-.502l1.539-3.076A1 1 0 0 1 8.618 7h6.764a1 1 0 0 1 .894.553l1.539 3.076a1 1 0 0 0 .578.502l1.923.641a1 1 0 0 1 .684.949V16a1 1 0 0 1-1 1h-2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
+  "truck": '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  "cart": '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  "bag": '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  "credit-card": '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+  "dollar": '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  "bar-chart": '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+  "pie-chart": '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+  "trending-up": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+  "briefcase": '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  "building": '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><line x1="8" y1="6" x2="8.01" y2="6"/><line x1="12" y1="6" x2="12.01" y2="6"/><line x1="16" y1="6" x2="16.01" y2="6"/><line x1="8" y1="10" x2="8.01" y2="10"/><line x1="12" y1="10" x2="12.01" y2="10"/><line x1="16" y1="10" x2="16.01" y2="10"/>',
+  "clipboard": '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
+  "archive": '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
+  "inbox": '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  "paperclip": '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  "pin": '<line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/>',
+  "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  "share": '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+  "check": '<polyline points="20 6 9 17 4 12"/>',
+  "check-circle": '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  "x": '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  "plus": '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  "minus": '<line x1="5" y1="12" x2="19" y2="12"/>',
+  "menu": '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+  "grid": '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  "list": '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+  "filter": '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+  "refresh": '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  "upload": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  "cloud": '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+  "lock": '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  "unlock": '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  "eye": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  "eye-off": '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
+  "info": '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  "alert": '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  "help": '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  "code": '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  "terminal": '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+  "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+  "server": '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+  "cpu": '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
+  "monitor": '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  "smartphone": '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+  "wifi": '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+  "battery": '<rect x="1" y="6" width="18" height="12" rx="2" ry="2"/><line x1="23" y1="13" x2="23" y2="11"/>',
+  "sun": '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  "moon": '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  "umbrella": '<path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>',
+  "coffee": '<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>',
+  "leaf": '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/>',
+  "zap": '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  "droplet": '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  "anchor": '<circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/>',
+  "award": '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  "activity": '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  "scissors": '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
+  "tool": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  "hammer": '<path d="M15 12l-8.5 8.5a2.12 2.12 0 0 1-3-3L12 9"/><path d="M17.64 15L22 10.64"/><path d="M20.91 11.7l-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h.86c.85 0 1.65.33 2.25.93l1.25 1.25"/>',
+  "thermometer": '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>',
+  "smile": '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+  "thumbs-up": '<path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>',
+  "arrow-up": '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
+  "arrow-down": '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>',
+  "arrow-left": '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  "arrow-right": '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+};
+const ICON_LIST: { n: string; kw: string }[] = [
+  { n: "ic:home", kw: "home casa inicio principal" },
+  { n: "ic:file", kw: "file arquivo documento pagina" },
+  { n: "ic:file-text", kw: "file text arquivo texto documento nota" },
+  { n: "ic:folder", kw: "folder pasta diretorio" },
+  { n: "ic:folder-open", kw: "folder open pasta aberta" },
+  { n: "ic:edit", kw: "edit editar lapis escrever" },
+  { n: "ic:trash", kw: "trash lixo excluir apagar deletar" },
+  { n: "ic:copy", kw: "copy copiar duplicar" },
+  { n: "ic:save", kw: "save salvar guardar disco" },
+  { n: "ic:search", kw: "search buscar procurar lupa pesquisar" },
+  { n: "ic:settings", kw: "settings config ajustes engrenagem opcoes" },
+  { n: "ic:user", kw: "user usuario pessoa perfil conta" },
+  { n: "ic:users", kw: "users usuarios pessoas equipe grupo time" },
+  { n: "ic:heart", kw: "heart coracao amor favorito curtir" },
+  { n: "ic:star", kw: "star estrela favorito destaque" },
+  { n: "ic:bookmark", kw: "bookmark marcador salvar favorito" },
+  { n: "ic:flag", kw: "flag bandeira marcar sinalizar" },
+  { n: "ic:tag", kw: "tag etiqueta rotulo marcador preco" },
+  { n: "ic:bell", kw: "bell sino notificacao aviso alerta" },
+  { n: "ic:calendar", kw: "calendar calendario data agenda" },
+  { n: "ic:clock", kw: "clock relogio hora tempo" },
+  { n: "ic:mail", kw: "mail email correio envelope mensagem" },
+  { n: "ic:message", kw: "message chat conversa balao mensagem" },
+  { n: "ic:phone", kw: "phone telefone ligar contato" },
+  { n: "ic:send", kw: "send enviar aviao mensagem" },
+  { n: "ic:camera", kw: "camera foto fotografia" },
+  { n: "ic:image", kw: "image imagem foto figura" },
+  { n: "ic:video", kw: "video filme camera gravar" },
+  { n: "ic:music", kw: "music musica som audio nota" },
+  { n: "ic:play", kw: "play reproduzir tocar iniciar" },
+  { n: "ic:headphones", kw: "headphones fone audio ouvir" },
+  { n: "ic:mic", kw: "mic microfone gravar voz" },
+  { n: "ic:book", kw: "book livro leitura" },
+  { n: "ic:book-open", kw: "book open livro aberto leitura" },
+  { n: "ic:pen", kw: "pen caneta pena escrever" },
+  { n: "ic:brush", kw: "brush pincel pintar desenhar" },
+  { n: "ic:lightbulb", kw: "lightbulb ideia lampada luz" },
+  { n: "ic:target", kw: "target alvo objetivo meta foco" },
+  { n: "ic:trophy", kw: "trophy trofeu premio vitoria" },
+  { n: "ic:crown", kw: "crown coroa rei vip premium" },
+  { n: "ic:gift", kw: "gift presente caixa surpresa" },
+  { n: "ic:fire", kw: "fire fogo chama quente" },
+  { n: "ic:rocket", kw: "rocket foguete lancar nave" },
+  { n: "ic:map-pin", kw: "map pin local localizacao mapa marcador" },
+  { n: "ic:map", kw: "map mapa localizacao" },
+  { n: "ic:compass", kw: "compass bussola direcao navegar" },
+  { n: "ic:globe", kw: "globe mundo globo planeta web" },
+  { n: "ic:plane", kw: "plane aviao viagem voo" },
+  { n: "ic:car", kw: "car carro veiculo automovel" },
+  { n: "ic:truck", kw: "truck caminhao entrega frete" },
+  { n: "ic:cart", kw: "cart carrinho compras loja" },
+  { n: "ic:bag", kw: "bag sacola bolsa compras" },
+  { n: "ic:credit-card", kw: "credit card cartao pagamento" },
+  { n: "ic:dollar", kw: "dollar dinheiro cifrao pagamento valor" },
+  { n: "ic:bar-chart", kw: "bar chart grafico barras dados" },
+  { n: "ic:pie-chart", kw: "pie chart grafico pizza dados" },
+  { n: "ic:trending-up", kw: "trending up crescimento subir grafico" },
+  { n: "ic:briefcase", kw: "briefcase maleta trabalho negocio" },
+  { n: "ic:building", kw: "building predio empresa escritorio" },
+  { n: "ic:clipboard", kw: "clipboard prancheta lista area transferencia" },
+  { n: "ic:archive", kw: "archive arquivo caixa guardar" },
+  { n: "ic:inbox", kw: "inbox caixa entrada mensagens" },
+  { n: "ic:paperclip", kw: "paperclip clipe anexo" },
+  { n: "ic:pin", kw: "pin alfinete fixar pregar" },
+  { n: "ic:link", kw: "link corrente url conexao" },
+  { n: "ic:share", kw: "share compartilhar conexao nos diagrama" },
+  { n: "ic:check", kw: "check certo confirmar ok feito" },
+  { n: "ic:check-circle", kw: "check circle confirmado concluido ok" },
+  { n: "ic:x", kw: "x fechar cancelar erro" },
+  { n: "ic:plus", kw: "plus mais adicionar novo" },
+  { n: "ic:minus", kw: "minus menos remover" },
+  { n: "ic:menu", kw: "menu lista hamburguer opcoes" },
+  { n: "ic:grid", kw: "grid grade quadros painel" },
+  { n: "ic:list", kw: "list lista itens" },
+  { n: "ic:filter", kw: "filter filtro funil" },
+  { n: "ic:refresh", kw: "refresh atualizar recarregar sincronizar" },
+  { n: "ic:download", kw: "download baixar salvar" },
+  { n: "ic:upload", kw: "upload enviar subir" },
+  { n: "ic:cloud", kw: "cloud nuvem armazenamento" },
+  { n: "ic:lock", kw: "lock cadeado bloquear seguranca" },
+  { n: "ic:unlock", kw: "unlock cadeado aberto desbloquear" },
+  { n: "ic:shield", kw: "shield escudo seguranca protecao" },
+  { n: "ic:eye", kw: "eye olho ver visualizar" },
+  { n: "ic:eye-off", kw: "eye off olho oculto esconder" },
+  { n: "ic:info", kw: "info informacao detalhes" },
+  { n: "ic:alert", kw: "alert alerta aviso atencao perigo" },
+  { n: "ic:help", kw: "help ajuda duvida pergunta interrogacao" },
+  { n: "ic:code", kw: "code codigo programar dev" },
+  { n: "ic:terminal", kw: "terminal console comando" },
+  { n: "ic:database", kw: "database banco dados" },
+  { n: "ic:server", kw: "server servidor" },
+  { n: "ic:cpu", kw: "cpu processador chip" },
+  { n: "ic:monitor", kw: "monitor tela computador" },
+  { n: "ic:smartphone", kw: "smartphone celular telefone" },
+  { n: "ic:wifi", kw: "wifi internet rede sinal" },
+  { n: "ic:battery", kw: "battery bateria energia" },
+  { n: "ic:sun", kw: "sun sol dia claro" },
+  { n: "ic:moon", kw: "moon lua noite escuro" },
+  { n: "ic:umbrella", kw: "umbrella guarda chuva" },
+  { n: "ic:coffee", kw: "coffee cafe bebida xicara" },
+  { n: "ic:leaf", kw: "leaf folha planta natureza" },
+  { n: "ic:zap", kw: "zap raio energia rapido" },
+  { n: "ic:droplet", kw: "droplet gota agua" },
+  { n: "ic:anchor", kw: "anchor ancora barco mar" },
+  { n: "ic:award", kw: "award medalha premio conquista" },
+  { n: "ic:activity", kw: "activity atividade pulso saude grafico" },
+  { n: "ic:scissors", kw: "scissors tesoura cortar recortar" },
+  { n: "ic:tool", kw: "tool ferramenta chave configurar" },
+  { n: "ic:hammer", kw: "hammer martelo construir" },
+  { n: "ic:thermometer", kw: "thermometer termometro temperatura" },
+  { n: "ic:smile", kw: "smile sorriso feliz emocao" },
+  { n: "ic:thumbs-up", kw: "thumbs up curtir like positivo" },
+  { n: "ic:arrow-up", kw: "arrow up seta cima" },
+  { n: "ic:arrow-down", kw: "arrow down seta baixo" },
+  { n: "ic:arrow-left", kw: "arrow left seta esquerda" },
+  { n: "ic:arrow-right", kw: "arrow right seta direita" },
+];
+const ICON_NAMES = ICON_LIST.map((i) => i.n);
+
+const isUicon = (s: any) => typeof s === "string" && (s.indexOf("ic:") === 0 || s.indexOf("ri-") === 0 || s.indexOf("fi-") === 0);
+function svgIcon(inner: string) {
+  return <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "-0.125em" }} dangerouslySetInnerHTML={{ __html: inner }} />;
+}
 function pageIconNode(icon: any) {
   if (typeof icon === "string") {
+    if (icon.indexOf("ic:") === 0) { const inner = ICON_SVGS[icon.slice(3)]; if (inner) return svgIcon(inner); }
     if (icon.indexOf("ri-") === 0) return <i className={icon} style={{ fontStyle: "normal", lineHeight: 1, display: "inline-block" }} />;
     if (icon.indexOf("fi-") === 0) return <i className={"fi " + icon} style={{ fontStyle: "normal", lineHeight: 1, display: "inline-block" }} />;
   }
   return icon;
 }
-const UICON_CSS = [
-  "https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css",
-  "https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css",
-  "https://cdn-uicons.flaticon.com/2.6.0/uicons-bold-rounded/css/uicons-bold-rounded.css",
-  "https://cdn-uicons.flaticon.com/2.6.0/uicons-solid-rounded/css/uicons-solid-rounded.css",
-  "https://cdn-uicons.flaticon.com/2.6.0/uicons-brands/css/uicons-brands.css",
-];
+// Compatibilidade: webfonts antigas (Remix) ainda injetadas p/ ícones ri- já salvos.
+const UICON_CSS = ["https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css"];
 let uiconsLinked = false;
 function linkUicons() {
   if (uiconsLinked || typeof document === "undefined") return;
@@ -90,45 +328,6 @@ function linkUicons() {
     l.rel = "stylesheet"; l.href = href; l.setAttribute("data-uicon", "1");
     document.head.appendChild(l);
   }
-}
-const UICON_FALLBACK = "ri-home-line ri-home-2-line ri-home-smile-line ri-user-line ri-user-3-line ri-group-line ri-team-line ri-settings-3-line ri-settings-4-line ri-search-line ri-heart-line ri-star-line ri-bookmark-line ri-calendar-line ri-calendar-check-line ri-time-line ri-alarm-line ri-notification-3-line ri-mail-line ri-mail-open-line ri-send-plane-line ri-chat-1-line ri-chat-3-line ri-question-answer-line ri-phone-line ri-camera-line ri-image-line ri-film-line ri-movie-line ri-music-2-line ri-play-line ri-pause-line ri-stop-line ri-folder-line ri-folder-open-line ri-folder-2-line ri-file-line ri-file-text-line ri-file-list-line ri-file-copy-line ri-delete-bin-line ri-edit-line ri-pencil-line ri-add-line ri-subtract-line ri-close-line ri-check-line ri-checkbox-circle-line ri-menu-line ri-apps-line ri-list-check ri-grid-line ri-layout-grid-line ri-filter-line ri-refresh-line ri-download-2-line ri-upload-2-line ri-cloud-line ri-link ri-share-line ri-lock-line ri-lock-unlock-line ri-key-2-line ri-shield-line ri-shield-check-line ri-eye-line ri-eye-off-line ri-lightbulb-line ri-fire-line ri-flashlight-line ri-global-line ri-earth-line ri-map-pin-line ri-map-2-line ri-compass-3-line ri-car-line ri-flight-takeoff-line ri-rocket-line ri-rocket-2-line ri-gift-line ri-shopping-cart-line ri-shopping-bag-line ri-bank-card-line ri-wallet-3-line ri-coins-line ri-money-dollar-circle-line ri-bar-chart-line ri-bar-chart-box-line ri-line-chart-line ri-pie-chart-line ri-dashboard-line ri-dashboard-3-line ri-briefcase-line ri-building-line ri-building-4-line ri-community-line ri-graduation-cap-line ri-book-line ri-book-open-line ri-book-2-line ri-quill-pen-line ri-palette-line ri-brush-line ri-magic-line ri-vip-crown-line ri-trophy-line ri-medal-line ri-flag-line ri-price-tag-3-line ri-megaphone-line ri-focus-3-line ri-thumb-up-line ri-thumb-down-line ri-emotion-line ri-emotion-happy-line ri-emotion-unhappy-line ri-arrow-up-line ri-arrow-down-line ri-arrow-left-line ri-arrow-right-line ri-arrow-up-s-line ri-arrow-down-s-line ri-arrow-left-s-line ri-arrow-right-s-line ri-information-line ri-error-warning-line ri-alert-line ri-question-line ri-bug-line ri-terminal-box-line ri-code-s-slash-line ri-database-2-line ri-server-line ri-cpu-line ri-computer-line ri-smartphone-line ri-macbook-line ri-tablet-line ri-keyboard-line ri-mouse-line ri-printer-line ri-wifi-line ri-battery-2-line ri-plug-line ri-mic-line ri-headphone-line ri-volume-up-line ri-sun-line ri-moon-line ri-cloud-windy-line ri-rainy-line ri-snowy-line ri-umbrella-line ri-cup-line ri-goblet-line ri-restaurant-line ri-cake-3-line ri-leaf-line ri-plant-line ri-seedling-line ri-football-line ri-basketball-line ri-ping-pong-line ri-run-line ri-bike-line ri-walk-line ri-clipboard-line ri-archive-line ri-inbox-line ri-attachment-line ri-pushpin-line ri-hourglass-line ri-bank-line ri-government-line ri-hospital-line ri-store-2-line ri-receipt-line ri-box-3-line ri-truck-line ri-ship-line ri-tools-line ri-hammer-line ri-scissors-line ri-ruler-line ri-paint-brush-line ri-gamepad-line ri-puzzle-line ri-lightbulb-flash-line ri-target-line ri-trophy-fill ri-heart-fill ri-star-fill ri-home-fill ri-user-fill ri-fire-fill ri-flag-fill ri-bookmark-fill ri-checkbox-circle-fill ri-folder-fill ri-mail-fill ri-settings-3-fill ri-shield-fill ri-rocket-fill ri-thumb-up-fill ri-bell-fill ri-calendar-fill ri-cloud-fill ri-camera-fill ri-gift-fill ri-lightbulb-fill ri-map-pin-fill ri-shopping-cart-fill ri-eye-fill ri-lock-fill".split(" ");
-let uiconNamesPromise: Promise<string[]> | null = null;
-function loadUiconNames(): Promise<string[]> {
-  if (uiconNamesPromise) return uiconNamesPromise;
-  uiconNamesPromise = (async () => {
-    const set = new Set<string>();
-    // 1) varre as folhas já carregadas (funciona se o CDN permitir CORS)
-    try {
-      for (const sh of Array.from(document.styleSheets) as any[]) {
-        let rules: any = null;
-        try { rules = sh.cssRules; } catch (e) { rules = null; }
-        if (!rules) continue;
-        for (const r of Array.from(rules) as any[]) {
-          const sel = r && r.selectorText;
-          if (!sel) continue;
-          const mm = sel.match(/\.(?:ri|fi)-[a-z0-9-]+/gi);
-          if (mm) for (const c of mm) set.add(c.slice(1));
-        }
-      }
-    } catch (e) {}
-    // 2) baixa o CSS para obter a lista completa de cada conjunto
-    if (set.size < 200) {
-      for (const href of UICON_CSS) {
-        try {
-          const res = await fetch(href);
-          if (!res.ok) continue;
-          const txt = await res.text();
-          const mm = txt.match(/\.(?:ri|fi)-[a-z0-9-]+:{1,2}before/gi);
-          if (mm) for (const c of mm) set.add(c.replace(/:{1,2}before/i, "").slice(1));
-        } catch (e) {}
-      }
-    }
-    if (set.size === 0) UICON_FALLBACK.forEach((n) => set.add(n));
-    const arr = Array.from(set).sort();
-    if (arr.length < 200) uiconNamesPromise = null; // permite nova tentativa após a fonte carregar
-    return arr;
-  })();
-  return uiconNamesPromise;
 }
 
 const TEXT_COLORS = [
@@ -900,7 +1099,7 @@ function AppContent({ db, user, files }: any) {
         ? [{ id: uid(), type: "canvas", paper: "lines", bg: "transparent", els: [] }]
         : [newBlock()];
       const newTitle = isDiagram ? "Novo diagrama" : isCanvas ? "Novo caderno" : "";
-      const newIcon = isDiagram ? "🗺️" : isCanvas ? "🎨" : "📄";
+      const newIcon = isDiagram ? "ic:share" : isCanvas ? "ic:edit" : "ic:file-text";
       const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, content, sort_order) VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *", [user.id, parentId, newTitle, newIcon, JSON.stringify(content), sortOrder]);
       const np = parseRows(r)[0];
       setPages((prev) => [...prev, np]);
@@ -919,7 +1118,7 @@ function AppContent({ db, user, files }: any) {
       let sortOrder = siblings.length;
       const created: any[] = [];
       for (const it of items) {
-        const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, content, sort_order) VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *", [user.id, parentId, it.title || "Página importada", "📄", JSON.stringify(it.content || []), sortOrder++]);
+        const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, content, sort_order) VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *", [user.id, parentId, it.title || "Página importada", "ic:file-text", JSON.stringify(it.content || []), sortOrder++]);
         created.push(parseRows(r)[0]);
       }
       setPages((prev) => [...prev, ...created]);
@@ -4485,21 +4684,10 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
 function IconPicker({ onClose, onPick }: any) {
   const [tab, setTab] = useState<"icons" | "emoji">("icons");
   const [search, setSearch] = useState("");
-  const [names, setNames] = useState<string[]>([]);
-  const [loadingIcons, setLoadingIcons] = useState(false);
-
-  useEffect(() => {
-    if (tab !== "icons") return;
-    linkUicons();
-    let alive = true;
-    setLoadingIcons(true);
-    loadUiconNames().then((n) => { if (alive) { setNames(n); setLoadingIcons(false); } }).catch(() => { if (alive) setLoadingIcons(false); });
-    return () => { alive = false; };
-  }, [tab]);
 
   const q = search.trim().toLowerCase();
-  const filteredIcons = q ? names.filter((n) => n.indexOf(q) !== -1) : names;
-  const shownIcons = filteredIcons.slice(0, 900);
+  const filteredList = q ? ICON_LIST.filter((it) => it.kw.indexOf(q) !== -1 || it.n.indexOf(q) !== -1) : ICON_LIST;
+  const shownIcons = filteredList.map((it) => it.n);
   const filteredEmojis = EMOJIS; // emojis não têm nome p/ busca
 
   const tabBtn = (active: boolean) => "h-8 px-3 rounded-md text-sm font-medium transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent");
@@ -4524,13 +4712,13 @@ function IconPicker({ onClose, onPick }: any) {
         <>
           <div className="grid grid-cols-8 sm:grid-cols-10 gap-1 max-h-72 overflow-y-auto p-1">
             {(Array.isArray(shownIcons) ? shownIcons : []).map((n) => (
-              <button key={n} onClick={() => onPick(n)} title={n.replace(/^(?:ri|fi)-(?:[a-z]+-)?/, "").replace(/-(?:line|fill)$/, "").replace(/-/g, " ")} className="h-9 w-9 flex items-center justify-center text-lg rounded-md hover:bg-accent text-foreground transition-colors hover:scale-110" type="button">
+              <button key={n} onClick={() => onPick(n)} title={n.replace(/^ic:/, "").replace(/-/g, " ")} className="h-9 w-9 flex items-center justify-center text-lg rounded-md hover:bg-accent text-foreground transition-colors hover:scale-110" type="button">
                 {pageIconNode(n)}
               </button>
             ))}
           </div>
           <div className="mt-2 text-[11px] text-muted-foreground">
-            {loadingIcons ? "Carregando ícones…" : (filteredIcons.length + " ícones" + (filteredIcons.length > shownIcons.length ? " — refine a busca para ver mais" : ""))}
+            {filteredList.length + " ícones planos"}
           </div>
         </>
       ) : (
@@ -4544,8 +4732,8 @@ function IconPicker({ onClose, onPick }: any) {
       )}
 
       <div className="mt-4 pt-3 border-t-2 border-border flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">Ícones por Flaticon UIcons</span>
-        <button onClick={() => onPick("📄")} className="h-8 px-3 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent" type="button">
+        <span className="text-[11px] text-muted-foreground">Ícones planos monocromáticos</span>
+        <button onClick={() => onPick("ic:file-text")} className="h-8 px-3 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent" type="button">
           Restaurar padrão
         </button>
       </div>
@@ -4915,7 +5103,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           el.className = "inline-flex items-center gap-1 text-primary font-semibold px-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer select-none transition-colors mx-1";
           el.dataset.pageId = page.id;
           el.contentEditable = "false";
-          const icoHtml = (typeof page.icon === "string" && page.icon.indexOf("ri-") === 0) ? '<i class="' + page.icon + '" style="font-style:normal"></i>' : (typeof page.icon === "string" && page.icon.indexOf("fi-") === 0) ? '<i class="fi ' + page.icon + '" style="font-style:normal"></i>' : (page.icon || "📄");
+          const icoSvg = (typeof page.icon === "string" && page.icon.indexOf("ic:") === 0) ? ICON_SVGS[page.icon.slice(3)] : null;
+          const icoHtml = icoSvg ? '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em">' + icoSvg + '</svg>' : (typeof page.icon === "string" && page.icon.indexOf("ri-") === 0) ? '<i class="' + page.icon + '" style="font-style:normal"></i>' : (typeof page.icon === "string" && page.icon.indexOf("fi-") === 0) ? '<i class="fi ' + page.icon + '" style="font-style:normal"></i>' : (page.icon || "📄");
           el.innerHTML = `<span class="text-xs pointer-events-none">${icoHtml}</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">${page.title || "Sem título"}</span>`;
           range.insertNode(el);
 
