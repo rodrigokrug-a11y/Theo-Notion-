@@ -40,7 +40,8 @@ const HASH = "mqo532";
 const TBL = "app_notion_pages_mqo532";
 
 const SLASH_ITEMS = [
-  { type: "pagelink", label: "Link de página", desc: "Citar e linkar outra página", display: "🔗", style: "" },
+  { type: "newpage", label: "Nova página", desc: "Criar uma subpágina e linká-la aqui", display: "📄", style: "", kw: "pagina nova subpagina criar pagelink" },
+  { type: "pagelink", label: "Link de página", desc: "Citar e linkar uma página existente", display: "🔗", style: "", kw: "link pagina citar referencia mencao" },
   { type: "paragraph", label: "Texto", desc: "Texto simples", display: "Aa", style: "text-base font-bold" },
   { type: "h1", label: "Título 1", desc: "Cabeçalho grande", display: "H1", style: "text-sm font-bold" },
   { type: "h2", label: "Título 2", desc: "Cabeçalho médio", display: "H2", style: "text-sm font-bold" },
@@ -4453,6 +4454,24 @@ function AppContent({ db, user, files }: any) {
     }
   };
 
+  // Cria uma subpágina e a retorna SEM navegar (usada pelo /pagina no texto)
+  const createLinkedPage = async (parentId: string | null, title: string) => {
+    if (!canEdit) return null;
+    try {
+      const siblings = (Array.isArray(pages) ? pages : []).filter((p) => p.parent_id === parentId && !p.deleted_at);
+      const sortOrder = siblings.length;
+      const content = [newBlock()];
+      const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, content, sort_order) VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING *", [user.id, parentId, title || "", "ic:file-text", JSON.stringify(content), sortOrder]);
+      const np = parseRows(r)[0];
+      setPages((prev) => [...prev, np]);
+      if (parentId) setExpanded((e) => ({ ...e, [parentId]: true }));
+      return np;
+    } catch (e: any) {
+      toast("Erro ao criar página: " + e.message, "error");
+      return null;
+    }
+  };
+
   const createImportedPages = async (parentId: string | null, items: any[]) => {
     if (!canEdit || !Array.isArray(items) || !items.length) return;
     try {
@@ -4764,6 +4783,7 @@ function AppContent({ db, user, files }: any) {
                 showColorPicker={showColorPicker} setShowColorPicker={setShowColorPicker}
                 onSelectPage={(id: string) => setActiveId(id)} onCreateSubpage={() => createPage(activePage.id)}
                 onCreateEmbed={(kind: "diagram" | "canvas") => createEmbeddedPage(activePage.id, kind)}
+                onCreatePageLink={(title: string) => createLinkedPage(activePage.id, title)}
               />
             )
           ) : (
@@ -5135,7 +5155,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
   );
 }
 
-function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, setShowIconPicker, showCoverPicker, setShowCoverPicker, showColorPicker, setShowColorPicker, onSelectPage, onCreateSubpage, onCreateEmbed }: any) {
+function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, setShowIconPicker, showCoverPicker, setShowCoverPicker, showColorPicker, setShowColorPicker, onSelectPage, onCreateSubpage, onCreateEmbed, onCreatePageLink }: any) {
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const [title, setTitle] = useState(page.title || "");
 
@@ -5192,7 +5212,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           className="w-full bg-transparent font-bold outline-none resize-none border-0 p-0 mb-4 block text-foreground placeholder:text-muted-foreground/50"
           style={{ fontSize: "44px", lineHeight: "1.2", minHeight: "60px", fontFamily: "inherit" }}
         />
-        <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} />
+        <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
 
         <div className="mt-12 pt-5 border-t border-border/60">
           <div className="flex items-center justify-between mb-3">
@@ -8577,11 +8597,12 @@ function FormatToolbar() {
   );
 }
 
-function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed }: any) {
+function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink }: any) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [slash, setSlash] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
   const [mention, setMention] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
   const [pageLinkFor, setPageLinkFor] = useState<{ blockId: string; query: string } | null>(null);
+  const [newPageFor, setNewPageFor] = useState<{ blockId: string; query: string } | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
 
@@ -8770,22 +8791,35 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     setMention(null);
   };
 
-  // Insere o link de página escolhido pelo comando "/" (edita o HTML do bloco)
-  const insertPageLink = (page: any) => {
-    const pl = pageLinkFor;
-    if (!pl) return;
-    const idx = (Array.isArray(list) ? list : []).findIndex((b) => b.id === pl.blockId);
-    if (idx === -1) { setPageLinkFor(null); return; }
+  // Insere o "chip" de link de página no HTML do bloco (no lugar do "/query")
+  const insertChipInBlock = (blockId: string, query: string, page: any) => {
+    const idx = (Array.isArray(list) ? list : []).findIndex((b) => b.id === blockId);
+    if (idx === -1) return;
     const cur = list[idx];
     const htmlStr = cur.html || "";
     const chip = pageChipHtml(page);
-    const searchStr = "/" + pl.query;
+    const searchStr = "/" + query;
     let html;
     const lastIdx = htmlStr.lastIndexOf(searchStr);
     if (lastIdx >= 0) html = htmlStr.substring(0, lastIdx) + chip + htmlStr.substring(lastIdx + searchStr.length);
     else { const fb = htmlStr.lastIndexOf("/"); html = fb >= 0 ? (htmlStr.substring(0, fb) + chip + htmlStr.substring(fb + 1)) : (htmlStr + chip); }
     const next = [...list]; next[idx] = { ...cur, html };
-    onChange(next); setPageLinkFor(null); setFocusId(pl.blockId);
+    onChange(next); setFocusId(blockId);
+  };
+  // "/" → linkar página existente
+  const insertPageLink = (page: any) => {
+    const pl = pageLinkFor;
+    if (!pl) return;
+    insertChipInBlock(pl.blockId, pl.query, page);
+    setPageLinkFor(null);
+  };
+  // "/" → criar nova subpágina e linká-la aqui
+  const createAndLinkPage = async (title: string) => {
+    const np = newPageFor;
+    if (!np || !onCreatePageLink) { setNewPageFor(null); return; }
+    const created = await onCreatePageLink(title);
+    if (created) insertChipInBlock(np.blockId, np.query, created);
+    setNewPageFor(null);
   };
 
   return (
@@ -8825,7 +8859,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
               onConvert={(type: string, q?: string) => convertBlock(block.id, type, q)}
               onInsertAfter={(type = "paragraph") => insertAfter(block.id, newBlock(type))}
               onPasteBlocks={(before: string, after: string, mdBlocks: any[]) => handlePasteBlocks(block.id, before, after, mdBlocks)}
-              onSelectPage={onSelectPage} pages={pages} onCreateEmbed={onCreateEmbed}
+              onSelectPage={onSelectPage} pages={pages} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink}
               onIndent={() => indentBlock(block.id)}
               onOutdent={() => outdentBlock(block.id)}
               canEdit={canEdit} files={files} listIndex={i} allBlocks={list}
@@ -8833,9 +8867,10 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           </div>
         </div>
       ))}
-      {slash && (<SlashMenu triggerRect={slash.rect} query={slash.query} onSelect={(t: string) => { if (!slash) return; if (t === "pagelink") { setPageLinkFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else { convertBlock(slash.blockId, t, slash.query); } }} onClose={() => setSlash(null)} />)}
+      {slash && (<SlashMenu triggerRect={slash.rect} query={slash.query} onSelect={(t: string) => { if (!slash) return; if (t === "pagelink") { setPageLinkFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else if (t === "newpage") { setNewPageFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else { convertBlock(slash.blockId, t, slash.query); } }} onClose={() => setSlash(null)} />)}
       {mention && (<MentionMenu triggerRect={mention.rect} query={mention.query} pages={pages} onSelect={insertMention} onClose={() => setMention(null)} />)}
       {pageLinkFor && (<PageLinkDialog pages={pages} onClose={() => setPageLinkFor(null)} onPick={insertPageLink} />)}
+      {newPageFor && (<NewPageDialog onClose={() => setNewPageFor(null)} onCreate={createAndLinkPage} />)}
     </div>
   );
 }
@@ -9310,6 +9345,13 @@ function useEditable(block: any, autoFocus: boolean, onAutoFocused: () => void) 
       lastIdRef.current = block.id + "-" + block.type;
     }
   }, [block.id, block.type]);
+  // Resincroniza o DOM quando o html muda de fora (ex.: inserir link de página
+  // via "/") e o bloco não está focado — não mexe no cursor durante a digitação.
+  useEffect(() => {
+    if (ref.current && document.activeElement !== ref.current && (ref.current.innerHTML || "") !== (block.html || "")) {
+      ref.current.innerHTML = block.html || "";
+    }
+  }, [block.html]);
   useEffect(() => {
     if (autoFocus && ref.current) {
       try {
@@ -9696,7 +9738,7 @@ function TableBlock({ block, onUpdate, canEdit, autoFocus, onAutoFocused }: any)
   );
 }
 
-function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBackspace, onSlashOpen, onSlashClose, onMentionOpen, onMentionClose, onSelectPage, onPasteBlocks, canEdit, files, pages, onCreateEmbed }: any) {
+function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBackspace, onSlashOpen, onSlashClose, onMentionOpen, onMentionClose, onSelectPage, onPasteBlocks, canEdit, files, pages, onCreateEmbed, onCreatePageLink }: any) {
   const ref = useEditable(block, autoFocus, onAutoFocused);
 
   const onInput = (e: any) => {
@@ -9748,7 +9790,7 @@ function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBac
       </div>
       {block.open && (
         <div className="ml-6 pl-3 border-l-2 border-border">
-          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} />
+          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
         </div>
       )}
     </div>
@@ -9825,8 +9867,33 @@ function PageLinkDialog({ pages, onClose, onPick }: any) {
   );
 }
 
+function NewPageDialog({ onClose, onCreate }: any) {
+  const [title, setTitle] = useState("");
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  const submit = async () => { if (busy) return; setBusy(true); try { await onCreate(title.trim()); } finally { setBusy(false); } };
+  return (
+    <CustomDialog open={true} onClose={onClose} title="Criar página linkada">
+      <input
+        ref={inputRef}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
+        placeholder="Título da nova página..."
+        className="w-full h-9 px-3 mb-3 rounded-md border-2 border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+      />
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="h-9 px-3 rounded-md text-sm text-muted-foreground hover:bg-accent transition-colors" type="button">Cancelar</button>
+        <button onClick={submit} disabled={busy} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50" type="button">{busy ? "Criando..." : "Criar e linkar"}</button>
+      </div>
+    </CustomDialog>
+  );
+}
+
 function SlashMenu({ triggerRect, query, onSelect, onClose }: any) {
-  const filtered = SLASH_ITEMS.filter((it: any) => { if (!query) return true; const q = query.toLowerCase(); return it.label.toLowerCase().includes(q) || it.type.includes(q); });
+  const norm = (x: string) => (x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const filtered = SLASH_ITEMS.filter((it: any) => { if (!query) return true; const q = norm(query); return norm(it.label).includes(q) || it.type.includes(q) || (it.kw && norm(it.kw).includes(q)); });
   const [active, setActive] = useState(0);
 
   useEffect(() => { setActive(0); }, [query]);
