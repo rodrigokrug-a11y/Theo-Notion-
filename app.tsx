@@ -525,6 +525,24 @@ const DIAGRAM_SHAPES = [
   { id: "darrow", label: "Seta dupla", icon: "↔" },
 ];
 const DIAGRAM_LINE_SHAPES = ["line", "arrow", "darrow"];
+// Linha/seta tratadas como vetor: as duas pontas vivem em cantos opostos da
+// bbox (x,y,w,h); flip escolhe a diagonal e rev qual ponta é o início/fim.
+function lineEnds(n: any) {
+  let x1, y1, x2, y2;
+  if (n.flip) { x1 = n.x; y1 = n.y; x2 = n.x + n.w; y2 = n.y + n.h; }
+  else { x1 = n.x; y1 = n.y + n.h; x2 = n.x + n.w; y2 = n.y; }
+  if (n.rev) return { x1: x2, y1: y2, x2: x1, y2: y1 };
+  return { x1, y1, x2, y2 };
+}
+// Calcula bbox + orientação a partir de dois pontos (início p1 → fim/ponta p2).
+function lineBoxFromPoints(p1: any, p2: any) {
+  const x = Math.min(p1.x, p2.x), y = Math.min(p1.y, p2.y);
+  const w = Math.max(1, Math.abs(p2.x - p1.x)), h = Math.max(1, Math.abs(p2.y - p1.y));
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const flip = (dx >= 0) === (dy >= 0);
+  const rev = flip ? !(dx >= 0 && dy >= 0) : !(dx >= 0 && dy < 0);
+  return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), flip, rev };
+}
 const DIAGRAM_PALETTE = [
   { bg: "#ffffff", border: "#334155", text: "#0f172a" },
   { bg: "#dbeafe", border: "#2563eb", text: "#1e3a8a" },
@@ -1934,6 +1952,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [edges, setEdges] = useState<any[]>(() => (Array.isArray(initBlock.edges) ? initBlock.edges : []));
   const [tool, setTool] = useState("select");
   const [pendingShape, setPendingShape] = useState("rect");
+  const [drawShape, setDrawShape] = useState<string | null>(null); // linha/seta armada p/ desenhar como vetor
+  const [lineDraft, setLineDraft] = useState<any>(null); // prévia enquanto arrasta
   const [paletteIdx, setPaletteIdx] = useState(1);
   const [selected, setSelected] = useState<any>(null); // {type:'node'|'edge', id}
   const [multiSel, setMultiSel] = useState<string[]>([]); // ids de nós (laço / grupo)
@@ -2117,11 +2137,21 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const cy = r ? (r.height / 2 - ty) / scale : 200;
     addNodeAt(shape, { x: cx, y: cy });
   };
+  const newLineNode = (shape: string, box: any) => {
+    const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
+    return { id: uid(), shape, x: box.x, y: box.y, w: box.w, h: box.h, flip: box.flip, rev: box.rev, text: "", bg: "transparent", color: pal.border, textColor: pal.text, fontSize: 15, lw: 3 };
+  };
   const addOrSetShape = (shape: string) => {
     setPendingShape(shape);
     if (selected && selected.type === "node") {
+      setDrawShape(null);
       commit(nodesRef.current.map((n: any) => (n.id === selected.id ? { ...n, shape } : n)), edgesRef.current);
+    } else if (DIAGRAM_LINE_SHAPES.indexOf(shape) !== -1) {
+      // linha/seta: arma o modo "desenhar vetor" — arraste de uma ponta à outra
+      setDrawShape(shape);
+      setSelected(null); setMultiSel([]);
     } else {
+      setDrawShape(null);
       addNode(shape);
     }
   };
@@ -2307,10 +2337,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (DIAGRAM_LINE_SHAPES.indexOf(n.shape) !== -1) {
       const c = n.color && n.color !== "transparent" ? n.color : "#334155";
       const lw = n.lw || 3, hsz = lw * 4 + 4;
-      let x1 = n.x, y1 = n.y + n.h, x2 = n.x + n.w, y2 = n.y;
+      const le = lineEnds(n); let x1 = le.x1, y1 = le.y1, x2 = le.x2, y2 = le.y2;
       let heads = "";
       if (n.shape !== "line") { const ah = arrowHeadAt(x1, y1, x2, y2, hsz); heads += '<polygon points="' + ah.poly + '" fill="' + c + '"/>'; x2 = ah.bx; y2 = ah.by; }
-      if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads += '<polygon points="' + sh.poly + '" fill="' + c + '"/>'; x1 = sh.bx; y1 = sh.by; }
+      if (n.shape === "darrow") { const sh = arrowHeadAt(le.x2, le.y2, le.x1, le.y1, hsz); heads += '<polygon points="' + sh.poly + '" fill="' + c + '"/>'; x1 = sh.bx; y1 = sh.by; }
       return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + lw + '" stroke-linecap="round"/>' + heads;
     }
     let sh = "";
@@ -2440,7 +2470,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       if (meta && e.key.toLowerCase() === "g" && !e.shiftKey) { e.preventDefault(); groupSelected(); return; }
       if (meta && (e.key.toLowerCase() === "g" && e.shiftKey)) { e.preventDefault(); ungroupSelected(); return; }
       if ((e.key === "Delete" || e.key === "Backspace") && (selected || multiSel.length)) { e.preventDefault(); deleteSelected(); return; }
-      if (e.key === "Escape") { setSelected(null); setMultiSel([]); setShapePanel(false); return; }
+      if (e.key === "Escape") { setSelected(null); setMultiSel([]); setShapePanel(false); setDrawShape(null); setLineDraft(null); return; }
       if (e.key === "Enter" && selected && selected.type === "node") { e.preventDefault(); const n = nodeById(selected.id); if (n) startEditNode(n); return; }
     };
     window.addEventListener("keydown", onKey);
@@ -2478,6 +2508,23 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
     if (effTool === "pan") { gestureRef.current = { kind: "pan", x: e.clientX, y: e.clientY, tx, ty }; return; }
 
+    // Linha/seta armada: arraste de uma ponta à outra (posiciona como vetor)
+    if (canEdit && drawShape) {
+      gestureRef.current = { kind: "drawline", shape: drawShape, x0: p.x, y0: p.y, snap: snap() };
+      setLineDraft({ x1: p.x, y1: p.y, x2: p.x, y2: p.y, shape: drawShape });
+      return;
+    }
+
+    // Pontas da linha/seta selecionada (mover cada extremidade do vetor)
+    if (canEdit && selected && selected.type === "node" && multiSel.length <= 1) {
+      const ln = nodeById(selected.id);
+      if (ln && DIAGRAM_LINE_SHAPES.indexOf(ln.shape) !== -1) {
+        const le2 = lineEnds(ln); const R = 13 / scale;
+        if (Math.hypot(p.x - le2.x1, p.y - le2.y1) <= R) { gestureRef.current = { kind: "lineend", id: ln.id, end: 1, moved: false, snap: snap() }; return; }
+        if (Math.hypot(p.x - le2.x2, p.y - le2.y2) <= R) { gestureRef.current = { kind: "lineend", id: ln.id, end: 2, moved: false, snap: snap() }; return; }
+      }
+    }
+
     // Alças da seta selecionada: pontas (reconectar/mover ponto) e alça de curvar
     if (canEdit && selected && selected.type === "edge") {
       const ed = edgesRef.current.find((x: any) => x.id === selected.id);
@@ -2501,10 +2548,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       }
     }
 
-    // alças de redimensionamento (só com 1 nó selecionado)
+    // alças de redimensionamento (só com 1 nó selecionado; linhas usam as pontas)
     if (canEdit && selected && selected.type === "node" && multiSel.length <= 1) {
       const n = nodeById(selected.id);
-      if (n) {
+      if (n && DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1) {
         const corners = [
           { x: n.x, y: n.y, ox: n.x + n.w, oy: n.y + n.h },
           { x: n.x + n.w, y: n.y, ox: n.x, oy: n.y + n.h },
@@ -2601,6 +2648,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       setEdgeDraft({ fromId: g.fromId, x: p.x, y: p.y, targetId: tgt && tgt.id !== g.fromId ? tgt.id : null });
       return;
     }
+    if (g.kind === "drawline") { setLineDraft({ x1: g.x0, y1: g.y0, x2: p.x, y2: p.y, shape: g.shape }); return; }
+    if (g.kind === "lineend") {
+      const n = nodeById(g.id);
+      if (n) {
+        const le2 = lineEnds(n);
+        const p1 = g.end === 1 ? p : { x: le2.x1, y: le2.y1 };
+        const p2 = g.end === 2 ? p : { x: le2.x2, y: le2.y2 };
+        const box = lineBoxFromPoints(p1, p2);
+        g.moved = true;
+        setData(nodesRef.current.map((nn: any) => (nn.id === g.id ? { ...nn, x: box.x, y: box.y, w: box.w, h: box.h, flip: box.flip, rev: box.rev } : nn)), edgesRef.current);
+      }
+      return;
+    }
     if (g.kind === "edgecurve") {
       const cv = Math.max(-400, Math.min(400, Math.round(2 * ((p.x - g.mbx) * g.nx + (p.y - g.mby) * g.ny))));
       g.moved = true;
@@ -2637,7 +2697,18 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const g = gestureRef.current;
     gestureRef.current = null;
     if (!g) return;
-    if (g.kind === "drag" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
+    if (g.kind === "drawline") {
+      const d = lineDraft; setLineDraft(null); setDrawShape(null);
+      let p1 = { x: g.x0, y: g.y0 }, p2 = d ? { x: d.x2, y: d.y2 } : p1;
+      if (Math.hypot(p2.x - p1.x, p2.y - p1.y) < 12) { p2 = { x: p1.x + 140, y: p1.y - 90 }; } // clique simples → linha padrão
+      const box = lineBoxFromPoints(p1, p2);
+      const nn = newLineNode(g.shape, box);
+      commit([...nodesRef.current, nn], edgesRef.current);
+      setSelected({ type: "node", id: nn.id });
+      return;
+    }
+    if (g.kind === "lineend" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
+    else if (g.kind === "drag" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "resize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "marquee") {
@@ -2662,6 +2733,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
   const onDoubleClick = (e: any) => {
     if (!canEdit) return;
+    if (drawShape) return; // no modo vetor, o arraste cria a linha/seta
     const p = getPos(e);
     const hn = nodeUnder(p);
     if (hn) { startEditNode(hn); return; }
@@ -2678,10 +2750,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (DIAGRAM_LINE_SHAPES.indexOf(n.shape) !== -1) {
       const c = n.color && n.color !== "transparent" ? n.color : "#334155";
       const lw = n.lw || 3, hsz = lw * 4 + 4;
-      let x1 = n.x, y1 = n.y + n.h, x2 = n.x + n.w, y2 = n.y;
+      const le = lineEnds(n); let x1 = le.x1, y1 = le.y1, x2 = le.x2, y2 = le.y2;
       const heads: any[] = [];
       if (n.shape !== "line") { const ah = arrowHeadAt(x1, y1, x2, y2, hsz); heads.push(<polygon key="he" points={ah.poly} fill={c} />); x2 = ah.bx; y2 = ah.by; }
-      if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
+      if (n.shape === "darrow") { const sh = arrowHeadAt(le.x2, le.y2, le.x1, le.y1, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
       return <g><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth={lw} strokeLinecap="round" />{heads}</g>;
     }
     if (n.shape === "image") return (
@@ -2751,7 +2823,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
-        style={{ touchAction: "none", cursor: effTool === "pan" ? "grab" : "default", backgroundColor: "hsl(var(--background))" }}
+        style={{ touchAction: "none", cursor: drawShape ? "crosshair" : effTool === "pan" ? "grab" : "default", backgroundColor: "hsl(var(--background))" }}
         onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
         onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
         onPointerDown={onPointerDown}
@@ -2780,6 +2852,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
             if (!t) return null;
             return <rect x={t.x - 4} y={t.y - 4} width={t.w + 8} height={t.h + 8} rx={14} fill="none" stroke="hsl(var(--primary))" strokeWidth={2 / scale} strokeDasharray={(5 / scale) + " " + (4 / scale)} />;
           })()}
+          {/* prévia da linha/seta sendo desenhada como vetor */}
+          {lineDraft && (
+            <line x1={lineDraft.x1} y1={lineDraft.y1} x2={lineDraft.x2} y2={lineDraft.y2} stroke="hsl(var(--primary))" strokeWidth={2.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} strokeLinecap="round" />
+          )}
           {/* âncoras de conexão */}
           {(Array.isArray(nodes) ? nodes : []).map((n: any) => (showAnchorsFor(n.id) ? (
             <g key={"a-" + n.id}>
@@ -2805,8 +2881,17 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               </g>
             );
           })()}
-          {/* caixa de seleção do nó */}
-          {selNode && canEdit && effTool === "select" && multiSel.length <= 1 && (
+          {/* caixa de seleção do nó (formas) OU pontas do vetor (linha/seta) */}
+          {selNode && canEdit && effTool === "select" && multiSel.length <= 1 && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) !== -1 && (() => {
+            const le2 = lineEnds(selNode); const r = 7 / scale;
+            return (
+              <g>
+                <circle cx={le2.x1} cy={le2.y1} r={r} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.8 / scale} />
+                <circle cx={le2.x2} cy={le2.y2} r={r} fill="hsl(var(--primary))" stroke="#ffffff" strokeWidth={1.6 / scale} />
+              </g>
+            );
+          })()}
+          {selNode && canEdit && effTool === "select" && multiSel.length <= 1 && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (
             <g>
               <rect x={selNode.x - 5} y={selNode.y - 5} width={selNode.w + 10} height={selNode.h + 10} rx={6} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} />
               {[
@@ -3066,8 +3151,16 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         );
       })()}
 
+      {/* Aviso do modo "desenhar linha/seta como vetor" */}
+      {canEdit && drawShape && (
+        <div className="canvas-pill absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-2xl border border-primary/40 shadow-lg px-3 py-1.5 flex items-center gap-2">
+          <span className="text-xs font-medium text-foreground">✏️ Arraste de uma ponta à outra para desenhar a {drawShape === "line" ? "linha" : "seta"}</span>
+          <button onClick={() => { setDrawShape(null); setLineDraft(null); }} className="h-6 px-2 rounded-lg text-xs text-muted-foreground hover:bg-accent transition-colors" type="button">Cancelar</button>
+        </div>
+      )}
+
       {/* Dica em diagrama vazio */}
-      {canEdit && nodes.length === 0 && !editing && (
+      {canEdit && nodes.length === 0 && !editing && !drawShape && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center text-muted-foreground/50 px-6">
             <div className="text-6xl mb-3">🗺️</div>
@@ -5675,10 +5768,10 @@ function DiagramPreview({ content }: any) {
         if (n.shape === "line" || n.shape === "arrow" || n.shape === "darrow") {
           const c = n.color && n.color !== "transparent" ? n.color : "#334155";
           const lw = n.lw || 3, hsz = lw * 4 + 4;
-          let x1 = n.x, y1 = n.y + n.h, x2 = n.x + n.w, y2 = n.y;
+          const le = lineEnds(n); let x1 = le.x1, y1 = le.y1, x2 = le.x2, y2 = le.y2;
           const heads: any[] = [];
           if (n.shape !== "line") { const ah = arrowHeadAt(x1, y1, x2, y2, hsz); heads.push(<polygon key="he" points={ah.poly} fill={c} />); x2 = ah.bx; y2 = ah.by; }
-          if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
+          if (n.shape === "darrow") { const sh = arrowHeadAt(le.x2, le.y2, le.x1, le.y1, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
           shape = <g><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth={lw} strokeLinecap="round" />{heads}</g>;
         }
         else if (n.shape === "rect") shape = <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={2} />;
