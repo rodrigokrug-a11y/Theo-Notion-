@@ -4837,7 +4837,7 @@ function MoveDialog({ page, pages, onClose, onMove }: any) {
     const items = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === parentId && !p.deleted_at && !forbidden.has(p.id)).sort((a: any, b: any) => a.sort_order - b.sort_order);
     const out: any[] = [];
     for (const p of items) {
-      const matchesSelf = !search || (p.title || "").toLowerCase().includes(search.toLowerCase());
+      const matchesSelf = !search || (p.title || "").toLowerCase().indexOf(search.toLowerCase()) !== -1;
       const childRows = renderTree(p.id, level + 1);
       if (matchesSelf || childRows.length > 0) {
         out.push(
@@ -9799,7 +9799,7 @@ function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBac
 
 function MentionMenu({ triggerRect, query, pages, onSelect, onClose }: any) {
   const q = (query || "").toLowerCase();
-  const filtered = (Array.isArray(pages)?pages:[]).filter((p: any) => !p.deleted_at && (p.title || "Sem título").toLowerCase().includes(q)).slice(0, 10);
+  const filtered = (Array.isArray(pages)?pages:[]).filter((p: any) => !p.deleted_at && (p.title || "Sem título").toLowerCase().indexOf(q) !== -1).slice(0, 10);
   const [active, setActive] = useState(0);
 
   useEffect(() => { setActive(0); }, [query]);
@@ -9841,7 +9841,7 @@ function PageLinkDialog({ pages, onClose, onPick }: any) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
   const ql = q.trim().toLowerCase();
-  const filtered = (Array.isArray(pages) ? pages : []).filter((p: any) => !p.deleted_at && (p.title || "Sem título").toLowerCase().includes(ql)).slice(0, 60);
+  const filtered = (Array.isArray(pages) ? pages : []).filter((p: any) => !p.deleted_at && (p.title || "Sem título").toLowerCase().indexOf(ql) !== -1).slice(0, 60);
   return (
     <CustomDialog open={true} onClose={onClose} title="Linkar página">
       <input
@@ -9946,7 +9946,7 @@ function CommandPalette({ pages, onClose, onSelect }: any) {
       const body = blocksToText(p.content || []).toLowerCase().slice(0, 500);
       const ql = q.toLowerCase().trim();
       if (!ql) return { p, score: 0, hit: "" };
-      if (titleLc.includes(ql)) return { p, score: 10, hit: p.title || "Sem título" };
+      if (titleLc.indexOf(ql) !== -1) return { p, score: 10, hit: p.title || "Sem título" };
       if (body.includes(ql)) {
         const idx = body.indexOf(ql);
         return { p, score: 5, hit: "..." + body.slice(Math.max(0, idx - 20), Math.min(body.length, idx + ql.length + 30)) + "..." };
