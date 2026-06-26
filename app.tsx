@@ -806,6 +806,29 @@ function imageDims(srcUrl: string) {
     im.src = srcUrl;
   });
 }
+// Monta um PDF de 1 página embutindo um JPEG (DCTDecode) — sem biblioteca externa.
+function buildPdfFromJpeg(jpeg: Uint8Array, w: number, h: number): Blob {
+  const enc = (s: string) => { const a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 0xff; return a; };
+  const parts: Uint8Array[] = [];
+  let pos = 0;
+  const off: number[] = [];
+  const put = (u: Uint8Array) => { parts.push(u); pos += u.length; };
+  const puts = (s: string) => put(enc(s));
+  puts("%PDF-1.3\n");
+  off[1] = pos; puts("1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n");
+  off[2] = pos; puts("2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n");
+  off[3] = pos; puts("3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 " + w + " " + h + "]/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>\nendobj\n");
+  off[4] = pos; puts("4 0 obj\n<</Type/XObject/Subtype/Image/Width " + w + "/Height " + h + "/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length " + jpeg.length + ">>\nstream\n");
+  put(jpeg); puts("\nendstream\nendobj\n");
+  const content = "q " + w + " 0 0 " + h + " 0 0 cm /Im0 Do Q\n";
+  off[5] = pos; puts("5 0 obj\n<</Length " + content.length + ">>\nstream\n" + content + "endstream\nendobj\n");
+  const xref = pos;
+  let x = "xref\n0 6\n0000000000 65535 f \n";
+  for (let i = 1; i <= 5; i++) x += String(off[i]).padStart(10, "0") + " 00000 n \n";
+  puts(x);
+  puts("trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n" + xref + "\n%%EOF");
+  return new Blob(parts as any, { type: "application/pdf" });
+}
 function makeImportedPage(title: string, srcUrl: string, iw: number, ih: number) {
   const def: any = CANVAS_SHEETS.find((s: any) => s.id === "a4");
   const landscape = iw > ih;
@@ -1926,6 +1949,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [shapePanel, setShapePanel] = useState(false);
   const [past, setPast] = useState<any[]>([]);
   const [future, setFuture] = useState<any[]>([]);
+  const [importing, setImporting] = useState<string | null>(null);
+  const [exportMenu, setExportMenu] = useState(false);
+  const dgFileRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = BeaUI.useToast();
 
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
@@ -2194,26 +2221,196 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     setTy(r.height / 2 - (minY + (maxY - minY) / 2) * ns);
   };
 
-  // Scroll move a tela; Ctrl/Cmd + scroll dá zoom no cursor
+  // ---- Importar imagens / PDF como nós de imagem ----
+  const addImageNodes = (imgs: any[]) => {
+    const r = svgRef.current ? svgRef.current.getBoundingClientRect() : ({ width: 800, height: 600 } as any);
+    const cx0 = (r.width / 2 - tx) / scale, cy0 = (r.height / 2 - ty) / scale;
+    const maxW = (r.width * 0.6) / scale, maxH = (r.height * 0.6) / scale;
+    const created: any[] = [];
+    let off = 0;
+    for (const im of imgs) {
+      if (!im.iw || !im.ih) continue;
+      const sc = Math.min(maxW / im.iw, maxH / im.ih, 1.5);
+      const w = Math.max(40, Math.round(im.iw * sc)), h = Math.max(40, Math.round(im.ih * sc));
+      created.push({ id: uid(), shape: "image", x: Math.round(cx0 - w / 2 + off), y: Math.round(cy0 - h / 2 + off), w, h, src: im.src, bg: "transparent", color: "transparent", text: "" });
+      off += 28;
+    }
+    if (!created.length) return;
+    commit([...nodesRef.current, ...created], edgesRef.current);
+    if (created.length > 1) { setMultiSel(created.map((c) => c.id)); setSelected({ type: "node", id: created[0].id }); }
+    else { setSelected({ type: "node", id: created[0].id }); setMultiSel([]); }
+  };
+  const handleDiagramImport = async (fl: any) => {
+    if (!fl || !fl.length) return;
+    const arr = Array.from(fl) as any[];
+    const out: any[] = [];
+    try {
+      for (const fcur of arr) {
+        if (fcur.type === "application/pdf" || /\.pdf$/i.test(fcur.name || "")) {
+          setImporting("Carregando leitor de PDF…");
+          const lib = await ensurePdfJs();
+          const buf = await fcur.arrayBuffer();
+          const pdf = await lib.getDocument({ data: buf }).promise;
+          const base = (fcur.name || "PDF").replace(/\.pdf$/i, "");
+          for (let i = 1; i <= pdf.numPages; i++) {
+            setImporting(base + " — página " + i + " de " + pdf.numPages + "…");
+            const pg = await pdf.getPage(i);
+            let vp = pg.getViewport({ scale: 1 });
+            const sc = Math.min(2.2, 1600 / Math.max(vp.width, vp.height));
+            vp = pg.getViewport({ scale: sc });
+            const cv = document.createElement("canvas");
+            cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+            const cx = cv.getContext("2d");
+            if (!cx) continue;
+            await pg.render({ canvasContext: cx, viewport: vp }).promise;
+            out.push({ src: cv.toDataURL("image/jpeg", 0.82), iw: cv.width, ih: cv.height });
+          }
+        } else if ((fcur.type || "").indexOf("image/") === 0) {
+          setImporting("Lendo " + (fcur.name || "imagem") + "…");
+          const srcUrl = await readFileAsDataURL(fcur);
+          const dim = await imageDims(srcUrl);
+          out.push({ src: srcUrl, iw: dim.w, ih: dim.h });
+        }
+      }
+      if (dgFileRef.current) dgFileRef.current.value = "";
+      setImporting(null);
+      if (!out.length) { toast("Nada para importar — escolha imagens ou PDF", "error"); return; }
+      addImageNodes(out);
+      toast(out.length === 1 ? "Imagem adicionada ao diagrama" : out.length + " imagens adicionadas", "success");
+    } catch (e: any) {
+      setImporting(null);
+      toast("Não consegui importar (o leitor de PDF pode estar bloqueado pela rede)", "error");
+    }
+  };
+
+  // ---- Exportar diagrama (PNG / PDF) — gera SVG puro e rasteriza ----
+  const xmlEsc = (v: any) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const nodeTextSvg = (n: any) => {
+    if (!n.text) return "";
+    const fsz = n.fontSize || 15, col = n.textColor || "#0f172a";
+    const lines = String(n.text).split("\n");
+    const lh = fsz * 1.25, cx = n.x + n.w / 2;
+    const startY = n.y + n.h / 2 - ((lines.length - 1) * lh) / 2;
+    let t = '<text x="' + cx + '" y="' + startY + '" font-size="' + fsz + '" fill="' + col + '" font-family="ui-sans-serif,system-ui,sans-serif" font-weight="500" text-anchor="middle" dominant-baseline="middle">';
+    lines.forEach((ln, i) => { t += '<tspan x="' + cx + '" dy="' + (i === 0 ? 0 : lh) + '">' + xmlEsc(ln) + '</tspan>'; });
+    return t + '</text>';
+  };
+  const nodeToSvgString = (n: any) => {
+    const fill = n.bg && n.bg !== "transparent" ? n.bg : "none";
+    const stroke = n.color && n.color !== "transparent" ? n.color : "none";
+    const sw = 2;
+    if (n.shape === "image") {
+      let out = '<image xlink:href="' + n.src + '" href="' + n.src + '" x="' + n.x + '" y="' + n.y + '" width="' + Math.max(1, n.w) + '" height="' + Math.max(1, n.h) + '" preserveAspectRatio="xMidYMid meet"/>';
+      if (stroke !== "none") out += '<rect x="' + n.x + '" y="' + n.y + '" width="' + Math.max(1, n.w) + '" height="' + Math.max(1, n.h) + '" rx="6" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      return out;
+    }
+    if (DIAGRAM_LINE_SHAPES.indexOf(n.shape) !== -1) {
+      const c = n.color && n.color !== "transparent" ? n.color : "#334155";
+      const lw = n.lw || 3, hsz = lw * 4 + 4;
+      let x1 = n.x, y1 = n.y + n.h, x2 = n.x + n.w, y2 = n.y;
+      let heads = "";
+      if (n.shape !== "line") { const ah = arrowHeadAt(x1, y1, x2, y2, hsz); heads += '<polygon points="' + ah.poly + '" fill="' + c + '"/>'; x2 = ah.bx; y2 = ah.by; }
+      if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads += '<polygon points="' + sh.poly + '" fill="' + c + '"/>'; x1 = sh.bx; y1 = sh.by; }
+      return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + lw + '" stroke-linecap="round"/>' + heads;
+    }
+    let sh = "";
+    if (n.shape === "rect") sh = '<rect x="' + n.x + '" y="' + n.y + '" width="' + Math.max(1, n.w) + '" height="' + Math.max(1, n.h) + '" rx="12" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+    else if (n.shape === "ellipse") sh = '<ellipse cx="' + (n.x + n.w / 2) + '" cy="' + (n.y + n.h / 2) + '" rx="' + Math.max(1, n.w / 2) + '" ry="' + Math.max(1, n.h / 2) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+    else if (n.shape === "triangle") sh = '<polygon points="' + ((n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
+    else if (n.shape !== "text") sh = '<polygon points="' + shapePoints({ kind: n.shape, x: n.x, y: n.y, w: n.w, h: n.h }) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
+    return sh + nodeTextSvg(n);
+  };
+  const edgeToSvgString = (ed: any) => {
+    const g = edgeGeom(ed);
+    if (!g) return "";
+    const col = ed.color || "#64748b";
+    const sw = ed.sw || 2, hsz = sw * 4 + 3;
+    const dash = ed.style === "dashed" ? ' stroke-dasharray="' + (sw * 3) + " " + (sw * 2.5) + '"' : ed.style === "dotted" ? ' stroke-dasharray="' + Math.max(0.4, sw * 0.1) + " " + (sw * 2.2) + '"' : "";
+    const endTan = g.cv ? g.cp : g.p1, startTan = g.cv ? g.cp : g.p2;
+    const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
+    const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
+    const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+    let out = '<path d="' + d + '" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linecap="round"' + dash + '/>';
+    if (ah) out += '<polygon points="' + ah.poly + '" fill="' + col + '"/>';
+    if (sh) out += '<polygon points="' + sh.poly + '" fill="' + col + '"/>';
+    if (ed.label) { const mid = bezierPt(g.p1, g.cp, g.p2, 0.5); out += '<text x="' + mid.x + '" y="' + mid.y + '" font-size="12" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" text-anchor="middle" dominant-baseline="middle">' + xmlEsc(ed.label) + '</text>'; }
+    return out;
+  };
+  const buildDiagramSvg = () => {
+    const ns = nodesRef.current, es = edgesRef.current;
+    if (!ns.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    ns.forEach((n: any) => { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h); });
+    es.forEach((ed: any) => { const g = edgeGeom(ed); if (g) { [g.p1, g.p2, g.cp].forEach((pt: any) => { if (pt) { minX = Math.min(minX, pt.x); minY = Math.min(minY, pt.y); maxX = Math.max(maxX, pt.x); maxY = Math.max(maxY, pt.y); } }); } });
+    const pad = 48;
+    const vbx = minX - pad, vby = minY - pad, vbw = (maxX - minX) + pad * 2, vbh = (maxY - minY) + pad * 2;
+    const inner = es.map(edgeToSvgString).join("") + ns.map(nodeToSvgString).join("");
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + vbw + '" height="' + vbh + '" viewBox="' + vbx + ' ' + vby + ' ' + vbw + ' ' + vbh + '"><rect x="' + vbx + '" y="' + vby + '" width="' + vbw + '" height="' + vbh + '" fill="#ffffff"/>' + inner + '</svg>';
+    return { svg, vbw, vbh };
+  };
+  const exportDiagram = (format: string) => {
+    setExportMenu(false);
+    try {
+      const built = buildDiagramSvg();
+      if (!built) { toast("Diagrama vazio — nada para exportar", "error"); return; }
+      const vbw = built.vbw, vbh = built.vbh;
+      const img = new Image();
+      const url = URL.createObjectURL(new Blob([built.svg], { type: "image/svg+xml;charset=utf-8" }));
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        const sc = Math.max(1, Math.min(3, 6000 / Math.max(vbw, vbh, 1)));
+        c.width = Math.max(1, Math.round(vbw * sc));
+        c.height = Math.max(1, Math.round(vbh * sc));
+        const ctx = c.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); return; }
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        const name = (title || page.title || "diagrama").replace(/\s+/g, "_");
+        if (format === "pdf") {
+          c.toBlob(async (blob) => {
+            if (!blob) { toast("Falha ao exportar", "error"); return; }
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            const pdf = buildPdfFromJpeg(bytes, c.width, c.height);
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(pdf); a.download = name + ".pdf"; a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            toast("PDF exportado!", "success");
+          }, "image/jpeg", 0.92);
+        } else {
+          c.toBlob((blob) => {
+            if (!blob) { toast("Falha ao exportar", "error"); return; }
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob); a.download = name + ".png"; a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            toast("PNG exportado!", "success");
+          }, "image/png");
+        }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); toast("Falha ao exportar", "error"); };
+      img.src = url;
+    } catch (e: any) {
+      toast("Não foi possível exportar", "error");
+    }
+  };
+
+  // Mouse no PC: rolagem = zoom no cursor. Shift+rolagem = mover na horizontal.
+  // (No tablet/touch o controle é por pinça/arraste — ver pinchRef.)
   useEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        const r = node.getBoundingClientRect();
-        const cx = e.clientX - r.left, cy = e.clientY - r.top;
-        const factor = Math.exp(-e.deltaY * 0.0016);
-        setScale((s) => {
-          const ns = Math.min(4, Math.max(0.2, s * factor));
-          setTx((t) => cx - ((cx - t) / s) * ns);
-          setTy((t) => cy - ((cy - t) / s) * ns);
-          return ns;
-        });
-      } else {
-        setTx((t) => t - e.deltaX);
-        setTy((t) => t - e.deltaY);
-      }
+      if (e.shiftKey) { setTx((t) => t - (e.deltaY || e.deltaX)); return; }
+      const r = node.getBoundingClientRect();
+      const cx = e.clientX - r.left, cy = e.clientY - r.top;
+      const factor = Math.exp(-e.deltaY * 0.0016);
+      setScale((s) => {
+        const ns = Math.min(4, Math.max(0.2, s * factor));
+        setTx((t) => cx - ((cx - t) / s) * ns);
+        setTy((t) => cy - ((cy - t) / s) * ns);
+        return ns;
+      });
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
@@ -2253,6 +2450,14 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const effTool = canEdit ? tool : "pan";
 
   const onPointerDown = (e: any) => {
+    // Botão do meio do mouse: move a tela em todas as direções (PC).
+    if (e.pointerType === "mouse" && e.button === 1) {
+      e.preventDefault();
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+      setEdgeDraft(null);
+      gestureRef.current = { kind: "pan", x: e.clientX, y: e.clientY, tx, ty };
+      return;
+    }
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (editRef.current) commitEditing();
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
@@ -2479,6 +2684,12 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       if (n.shape === "darrow") { const sh = arrowHeadAt(n.x + n.w, n.y, n.x, n.y + n.h, hsz); heads.push(<polygon key="hs" points={sh.poly} fill={c} />); x1 = sh.bx; y1 = sh.by; }
       return <g><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth={lw} strokeLinecap="round" />{heads}</g>;
     }
+    if (n.shape === "image") return (
+      <g>
+        <image href={n.src} xlinkHref={n.src} x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} preserveAspectRatio="xMidYMid meet" style={{ pointerEvents: "none" }} />
+        {stroke !== "transparent" && <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={6} fill="none" stroke={stroke} strokeWidth={sw} />}
+      </g>
+    );
     if (n.shape === "rect") return <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={sw} />;
     if (n.shape === "ellipse") return <ellipse cx={n.x + n.w / 2} cy={n.y + n.h / 2} rx={Math.max(1, n.w / 2)} ry={Math.max(1, n.h / 2)} fill={fill} stroke={stroke} strokeWidth={sw} />;
     if (n.shape === "triangle") return <polygon points={(n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
@@ -2541,6 +2752,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
         style={{ touchAction: "none", cursor: effTool === "pan" ? "grab" : "default", backgroundColor: "hsl(var(--background))" }}
+        onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+        onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -2704,8 +2917,35 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         <button onClick={resetView} className="h-8 px-1 shrink-0 flex items-center justify-center rounded-xl text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors min-w-[2.6rem]" title="Restaurar zoom (100%)" type="button">{Math.round(scale * 100)}%</button>
         <button onClick={() => zoomBy(1.2)} className="h-8 w-8 shrink-0 hidden sm:flex items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-lg font-bold" title="Aumentar zoom" type="button">+</button>
         <button onClick={fitView} className="h-8 w-8 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-sm" title="Ajustar conteúdo à tela" type="button">⤢</button>
+        <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden sm:block" />
+        {canEdit && (
+          <button onClick={() => { if (dgFileRef.current) dgFileRef.current.click(); }} className="h-8 px-2 shrink-0 flex items-center justify-center gap-1 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-[11px] font-semibold" title="Importar imagens ou PDF para o diagrama" type="button">📥<span className="hidden lg:inline">Importar</span></button>
+        )}
+        <div className="relative shrink-0">
+          <button onClick={() => setExportMenu((v) => !v)} className="h-8 px-2 shrink-0 flex items-center justify-center gap-1 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-[11px] font-semibold" title="Exportar o diagrama (PNG ou PDF)" type="button">⤓<span className="hidden lg:inline">Exportar</span></button>
+          {exportMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onPointerDown={() => setExportMenu(false)} />
+              <div className="bg-card canvas-pill absolute right-0 top-full mt-1 z-50 rounded-xl border border-border/70 shadow-2xl p-1 w-40" onPointerDown={(e) => e.stopPropagation()}>
+                <button onClick={() => exportDiagram("png")} className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground" type="button">🖼️ Imagem PNG</button>
+                <button onClick={() => exportDiagram("pdf")} className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground" type="button">📄 Documento PDF</button>
+              </div>
+            </>
+          )}
+        </div>
+        {canEdit && <input ref={dgFileRef} type="file" accept="application/pdf,image/*" multiple className="hidden" onChange={(e: any) => handleDiagramImport(e.target.files)} />}
         {headerRight}
       </div>
+
+      {/* Progresso de importação */}
+      {importing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+          <div className="bg-card canvas-pill rounded-2xl border border-border/70 shadow-2xl px-5 py-4 flex items-center gap-3">
+            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <span className="text-sm font-medium text-foreground">{importing}</span>
+          </div>
+        </div>
+      )}
 
       {/* Barra de ferramentas lateral */}
       {canEdit && (
@@ -2832,7 +3072,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           <div className="text-center text-muted-foreground/50 px-6">
             <div className="text-6xl mb-3">🗺️</div>
             <p className="text-sm font-medium">Clique numa forma à esquerda para começar — ou dê um duplo clique no quadro</p>
-            <p className="text-xs mt-1.5">Arraste pelas bolinhas para conectar (várias setas entre os mesmos itens, indo e voltando, vários→um e um→vários) · selecione a seta para curvar · duplo clique escreve dentro · Ctrl+C/Ctrl+V copia e cola · arraste no vazio para laçar vários e Ctrl+G agrupa · arraste os cantos para redimensionar · pinça/Ctrl+scroll dá zoom</p>
+            <p className="text-xs mt-1.5">Arraste pelas bolinhas para conectar (várias setas entre os mesmos itens, indo e voltando, vários→um e um→vários) · selecione a seta para curvar · duplo clique escreve dentro · Ctrl+C/Ctrl+V copia e cola · arraste no vazio para laçar vários e Ctrl+G agrupa · arraste os cantos para redimensionar · no PC a rolagem dá zoom e o botão do meio move a tela · no tablet use a pinça · 📥 importa imagens/PDF e ⤓ exporta PNG/PDF</p>
           </div>
         </div>
       )}
