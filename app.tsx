@@ -6770,8 +6770,8 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
   const [sheet, setSheet] = useState(initBlock.sheet || "infinite");
   const [orient, setOrient] = useState(initBlock.orient || "portrait");
   const orientRef = useRef(initBlock.orient || "portrait");
-  const [smooth, setSmooth] = useState(initBlock.smooth != null ? initBlock.smooth : 0.5);
-  const smoothRef = useRef(initBlock.smooth != null ? initBlock.smooth : 0.5);
+  const [smooth, setSmooth] = useState(initBlock.smooth != null ? initBlock.smooth : 0.2);
+  const smoothRef = useRef(initBlock.smooth != null ? initBlock.smooth : 0.2);
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState(CANVAS_COLORS[7]);
   const [sw, setSw] = useState(CANVAS_STROKES[1].w);
@@ -7370,7 +7370,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
     try { if (ne.getCoalescedEvents) { const ce = ne.getCoalescedEvents(); if (ce && ce.length) evs = ce; } } catch (err) {}
     const ctx = setupCtx(liveCanvasRef.current, view, lv.el.color);
     const ink = !!lv.el.ink;
-    const sm = smoothRef.current != null ? smoothRef.current : 0.5;
+    const sm = smoothRef.current != null ? smoothRef.current : 0.2;
     const keepPos = Math.min(0.9, Math.max(0, sm * 0.9));
     const keepW = Math.min(0.92, 0.4 + sm * 0.7);
     const cap = lv.el.pen === "highlighter" ? "butt" : "round";
