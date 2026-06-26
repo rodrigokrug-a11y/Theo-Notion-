@@ -65,17 +65,19 @@ const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉
 // ========================================================================
 // Ícones planos (Flaticon UIcons) — base alternativa aos emojis para páginas
 // ========================================================================
-const isUicon = (s: any) => typeof s === "string" && s.indexOf("fi-") === 0;
+const isUicon = (s: any) => typeof s === "string" && (s.indexOf("ri-") === 0 || s.indexOf("fi-") === 0);
 function pageIconNode(icon: any) {
-  if (isUicon(icon)) return <i className={"fi " + icon} style={{ fontStyle: "normal", lineHeight: 1, display: "inline-block" }} />;
+  if (typeof icon === "string") {
+    if (icon.indexOf("ri-") === 0) return <i className={icon} style={{ fontStyle: "normal", lineHeight: 1, display: "inline-block" }} />;
+    if (icon.indexOf("fi-") === 0) return <i className={"fi " + icon} style={{ fontStyle: "normal", lineHeight: 1, display: "inline-block" }} />;
+  }
   return icon;
 }
 const UICON_CSS = [
+  "https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css",
   "https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-rounded/css/uicons-regular-rounded.css",
   "https://cdn-uicons.flaticon.com/2.6.0/uicons-bold-rounded/css/uicons-bold-rounded.css",
   "https://cdn-uicons.flaticon.com/2.6.0/uicons-solid-rounded/css/uicons-solid-rounded.css",
-  "https://cdn-uicons.flaticon.com/2.6.0/uicons-regular-straight/css/uicons-regular-straight.css",
-  "https://cdn-uicons.flaticon.com/2.6.0/uicons-solid-straight/css/uicons-solid-straight.css",
   "https://cdn-uicons.flaticon.com/2.6.0/uicons-brands/css/uicons-brands.css",
 ];
 let uiconsLinked = false;
@@ -89,7 +91,7 @@ function linkUicons() {
     document.head.appendChild(l);
   }
 }
-const UICON_FALLBACK = "fi-rr-home fi-rr-apps fi-rr-user fi-rr-users fi-rr-settings fi-rr-settings-sliders fi-rr-search fi-rr-heart fi-rr-star fi-rr-bookmark fi-rr-calendar fi-rr-clock fi-rr-bell fi-rr-envelope fi-rr-paper-plane fi-rr-comment fi-rr-comments fi-rr-phone-call fi-rr-camera fi-rr-picture fi-rr-video-camera fi-rr-music fi-rr-play fi-rr-pause fi-rr-stop fi-rr-folder fi-rr-folder-open fi-rr-document fi-rr-file fi-rr-copy fi-rr-trash fi-rr-edit fi-rr-pencil fi-rr-plus fi-rr-minus fi-rr-cross fi-rr-check fi-rr-menu-burger fi-rr-list fi-rr-grid fi-rr-filter fi-rr-refresh fi-rr-download fi-rr-upload fi-rr-cloud fi-rr-link fi-rr-share fi-rr-lock fi-rr-unlock fi-rr-key fi-rr-shield fi-rr-eye fi-rr-eye-crossed fi-rr-bulb fi-rr-flame fi-rr-bolt fi-rr-world fi-rr-marker fi-rr-map fi-rr-compass fi-rr-car fi-rr-plane fi-rr-rocket fi-rr-gift fi-rr-shopping-cart fi-rr-shopping-bag fi-rr-credit-card fi-rr-wallet fi-rr-coins fi-rr-stats fi-rr-dashboard fi-rr-briefcase fi-rr-building fi-rr-graduation-cap fi-rr-book fi-rr-book-alt fi-rr-pen-clip fi-rr-palette fi-rr-brush fi-rr-magic-wand fi-rr-crown fi-rr-trophy fi-rr-flag fi-rr-tags fi-rr-megaphone fi-rr-target fi-rr-thumbs-up fi-rr-thumbs-down fi-rr-smile fi-rr-sad fi-rr-angry fi-rr-arrow-up fi-rr-arrow-down fi-rr-arrow-left fi-rr-arrow-right fi-rr-angle-up fi-rr-angle-down fi-rr-angle-left fi-rr-angle-right fi-rr-info fi-rr-exclamation fi-rr-interrogation fi-rr-bug fi-rr-database fi-rr-server fi-rr-laptop fi-rr-mobile fi-rr-desktop fi-rr-keyboard fi-rr-print fi-rr-wifi fi-rr-battery-full fi-rr-plug fi-rr-microphone fi-rr-headphones fi-rr-volume fi-rr-sun fi-rr-moon fi-rr-snowflake fi-rr-umbrella fi-rr-coffee fi-rr-restaurant fi-rr-leaf fi-rr-tree fi-rr-paw fi-rr-dumbbell fi-rr-bicycle fi-rr-clipboard fi-rr-archive fi-rr-inbox fi-rr-paperclip fi-rr-thumbtack fi-rr-hourglass fi-rr-id-badge fi-rr-sign-out fi-rr-sign-in fi-rr-bank fi-rr-chart-pie fi-rr-chart-histogram fi-rr-receipt fi-rr-box fi-rr-boxes fi-rr-shipping-fast".split(" ");
+const UICON_FALLBACK = "ri-home-line ri-home-2-line ri-home-smile-line ri-user-line ri-user-3-line ri-group-line ri-team-line ri-settings-3-line ri-settings-4-line ri-search-line ri-heart-line ri-star-line ri-bookmark-line ri-calendar-line ri-calendar-check-line ri-time-line ri-alarm-line ri-notification-3-line ri-mail-line ri-mail-open-line ri-send-plane-line ri-chat-1-line ri-chat-3-line ri-question-answer-line ri-phone-line ri-camera-line ri-image-line ri-film-line ri-movie-line ri-music-2-line ri-play-line ri-pause-line ri-stop-line ri-folder-line ri-folder-open-line ri-folder-2-line ri-file-line ri-file-text-line ri-file-list-line ri-file-copy-line ri-delete-bin-line ri-edit-line ri-pencil-line ri-add-line ri-subtract-line ri-close-line ri-check-line ri-checkbox-circle-line ri-menu-line ri-apps-line ri-list-check ri-grid-line ri-layout-grid-line ri-filter-line ri-refresh-line ri-download-2-line ri-upload-2-line ri-cloud-line ri-link ri-share-line ri-lock-line ri-lock-unlock-line ri-key-2-line ri-shield-line ri-shield-check-line ri-eye-line ri-eye-off-line ri-lightbulb-line ri-fire-line ri-flashlight-line ri-global-line ri-earth-line ri-map-pin-line ri-map-2-line ri-compass-3-line ri-car-line ri-flight-takeoff-line ri-rocket-line ri-rocket-2-line ri-gift-line ri-shopping-cart-line ri-shopping-bag-line ri-bank-card-line ri-wallet-3-line ri-coins-line ri-money-dollar-circle-line ri-bar-chart-line ri-bar-chart-box-line ri-line-chart-line ri-pie-chart-line ri-dashboard-line ri-dashboard-3-line ri-briefcase-line ri-building-line ri-building-4-line ri-community-line ri-graduation-cap-line ri-book-line ri-book-open-line ri-book-2-line ri-quill-pen-line ri-palette-line ri-brush-line ri-magic-line ri-vip-crown-line ri-trophy-line ri-medal-line ri-flag-line ri-price-tag-3-line ri-megaphone-line ri-focus-3-line ri-thumb-up-line ri-thumb-down-line ri-emotion-line ri-emotion-happy-line ri-emotion-unhappy-line ri-arrow-up-line ri-arrow-down-line ri-arrow-left-line ri-arrow-right-line ri-arrow-up-s-line ri-arrow-down-s-line ri-arrow-left-s-line ri-arrow-right-s-line ri-information-line ri-error-warning-line ri-alert-line ri-question-line ri-bug-line ri-terminal-box-line ri-code-s-slash-line ri-database-2-line ri-server-line ri-cpu-line ri-computer-line ri-smartphone-line ri-macbook-line ri-tablet-line ri-keyboard-line ri-mouse-line ri-printer-line ri-wifi-line ri-battery-2-line ri-plug-line ri-mic-line ri-headphone-line ri-volume-up-line ri-sun-line ri-moon-line ri-cloud-windy-line ri-rainy-line ri-snowy-line ri-umbrella-line ri-cup-line ri-goblet-line ri-restaurant-line ri-cake-3-line ri-leaf-line ri-plant-line ri-seedling-line ri-football-line ri-basketball-line ri-ping-pong-line ri-run-line ri-bike-line ri-walk-line ri-clipboard-line ri-archive-line ri-inbox-line ri-attachment-line ri-pushpin-line ri-hourglass-line ri-bank-line ri-government-line ri-hospital-line ri-store-2-line ri-receipt-line ri-box-3-line ri-truck-line ri-ship-line ri-tools-line ri-hammer-line ri-scissors-line ri-ruler-line ri-paint-brush-line ri-gamepad-line ri-puzzle-line ri-lightbulb-flash-line ri-target-line ri-trophy-fill ri-heart-fill ri-star-fill ri-home-fill ri-user-fill ri-fire-fill ri-flag-fill ri-bookmark-fill ri-checkbox-circle-fill ri-folder-fill ri-mail-fill ri-settings-3-fill ri-shield-fill ri-rocket-fill ri-thumb-up-fill ri-bell-fill ri-calendar-fill ri-cloud-fill ri-camera-fill ri-gift-fill ri-lightbulb-fill ri-map-pin-fill ri-shopping-cart-fill ri-eye-fill ri-lock-fill".split(" ");
 let uiconNamesPromise: Promise<string[]> | null = null;
 function loadUiconNames(): Promise<string[]> {
   if (uiconNamesPromise) return uiconNamesPromise;
@@ -103,27 +105,27 @@ function loadUiconNames(): Promise<string[]> {
         if (!rules) continue;
         for (const r of Array.from(rules) as any[]) {
           const sel = r && r.selectorText;
-          if (!sel || sel.indexOf(".fi-") === -1) continue;
-          const mm = sel.match(/\.fi-[a-z0-9-]+/gi);
+          if (!sel) continue;
+          const mm = sel.match(/\.(?:ri|fi)-[a-z0-9-]+/gi);
           if (mm) for (const c of mm) set.add(c.slice(1));
         }
       }
     } catch (e) {}
     // 2) baixa o CSS para obter a lista completa de cada conjunto
-    if (set.size < 120) {
+    if (set.size < 200) {
       for (const href of UICON_CSS) {
         try {
           const res = await fetch(href);
           if (!res.ok) continue;
           const txt = await res.text();
-          const mm = txt.match(/\.fi-[a-z0-9-]+:{1,2}before/gi);
+          const mm = txt.match(/\.(?:ri|fi)-[a-z0-9-]+:{1,2}before/gi);
           if (mm) for (const c of mm) set.add(c.replace(/:{1,2}before/i, "").slice(1));
         } catch (e) {}
       }
     }
     if (set.size === 0) UICON_FALLBACK.forEach((n) => set.add(n));
     const arr = Array.from(set).sort();
-    if (arr.length < 120) uiconNamesPromise = null; // permite nova tentativa após a fonte carregar
+    if (arr.length < 200) uiconNamesPromise = null; // permite nova tentativa após a fonte carregar
     return arr;
   })();
   return uiconNamesPromise;
@@ -1713,6 +1715,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [paletteIdx, setPaletteIdx] = useState(1);
   const [selected, setSelected] = useState<any>(null); // {type:'node'|'edge', id}
   const [multiSel, setMultiSel] = useState<string[]>([]); // ids de nós (laço / grupo)
+  const [clipReady, setClipReady] = useState<boolean>(!!(DIAGRAM_CLIP && DIAGRAM_CLIP.length)); // habilita botão "Colar"
   const [marquee, setMarquee] = useState<any>(null);
   const marqueeRef = useRef<any>(null);
   const [editing, setEditing] = useState<any>(null);   // {id, value, edge?}
@@ -1925,6 +1928,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const ids = selectedNodeIds();
     if (!ids.length) return false;
     DIAGRAM_CLIP = ids.map((id) => nodeById(id)).filter(Boolean).map((n: any) => clone(n));
+    setClipReady(DIAGRAM_CLIP.length > 0);
     return DIAGRAM_CLIP.length > 0;
   };
   const pasteDiagram = () => {
@@ -1939,6 +1943,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (copies.length > 1) { setMultiSel(copies.map((c: any) => c.id)); setSelected({ type: "node", id: copies[0].id }); }
     else { setSelected({ type: "node", id: copies[0].id }); setMultiSel([]); }
     DIAGRAM_CLIP = copies.map((c: any) => clone(c)); // colagem em cascata
+    setClipReady(true);
     return true;
   };
 
@@ -2477,6 +2482,24 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
             <button onClick={redo} disabled={!future.length} className={"h-8 w-8 shrink-0 flex items-center justify-center rounded-xl transition-colors text-base " + (future.length ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed")} title="Refazer (Ctrl+Y)" type="button">↪</button>
           </>
         )}
+        {canEdit && (() => {
+          const ids = selectedNodeIds();
+          const hasSel = ids.length > 0;
+          const selNodes = nodesRef.current.filter((n: any) => ids.indexOf(n.id) !== -1);
+          const groups = new Set(selNodes.map((n: any) => n.group || null));
+          const canGroup = ids.length >= 2 && !(groups.size === 1 && !groups.has(null));
+          const canUngroup = selNodes.some((n: any) => !!n.group);
+          const tb = (on: boolean) => "h-8 px-2 shrink-0 hidden md:flex items-center rounded-xl text-xs font-medium transition-colors " + (on ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed");
+          return (
+            <>
+              <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden md:block" />
+              <button onClick={() => copyDiagram()} disabled={!hasSel} className={tb(hasSel)} title="Copiar seleção (Ctrl+C)" type="button">⧉ Copiar</button>
+              <button onClick={() => pasteDiagram()} disabled={!clipReady} className={tb(clipReady)} title="Colar (Ctrl+V)" type="button">📋 Colar</button>
+              <button onClick={groupSelected} disabled={!canGroup} className={tb(canGroup)} title="Agrupar — movem juntos (Ctrl+G)" type="button">⊞ Agrupar</button>
+              <button onClick={ungroupSelected} disabled={!canUngroup} className={tb(canUngroup)} title="Desagrupar (Ctrl+Shift+G)" type="button">⊟ Desagrupar</button>
+            </>
+          );
+        })()}
         <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden sm:block" />
         <button onClick={() => zoomBy(1 / 1.2)} className="h-8 w-8 shrink-0 hidden sm:flex items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-lg font-bold" title="Diminuir zoom" type="button">−</button>
         <button onClick={resetView} className="h-8 px-1 shrink-0 flex items-center justify-center rounded-xl text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors min-w-[2.6rem]" title="Restaurar zoom (100%)" type="button">{Math.round(scale * 100)}%</button>
@@ -4480,8 +4503,8 @@ function IconPicker({ onClose, onPick }: any) {
         <>
           <div className="grid grid-cols-8 sm:grid-cols-10 gap-1 max-h-72 overflow-y-auto p-1">
             {(Array.isArray(shownIcons) ? shownIcons : []).map((n) => (
-              <button key={n} onClick={() => onPick(n)} title={n.replace(/^fi-[a-z]+-/, "").replace(/-/g, " ")} className="h-9 w-9 flex items-center justify-center text-lg rounded-md hover:bg-accent text-foreground transition-colors hover:scale-110" type="button">
-                <i className={"fi " + n} style={{ fontStyle: "normal", lineHeight: 1 }} />
+              <button key={n} onClick={() => onPick(n)} title={n.replace(/^(?:ri|fi)-(?:[a-z]+-)?/, "").replace(/-(?:line|fill)$/, "").replace(/-/g, " ")} className="h-9 w-9 flex items-center justify-center text-lg rounded-md hover:bg-accent text-foreground transition-colors hover:scale-110" type="button">
+                {pageIconNode(n)}
               </button>
             ))}
           </div>
@@ -4871,7 +4894,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           el.className = "inline-flex items-center gap-1 text-primary font-semibold px-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer select-none transition-colors mx-1";
           el.dataset.pageId = page.id;
           el.contentEditable = "false";
-          const icoHtml = isUicon(page.icon) ? '<i class="fi ' + page.icon + '" style="font-style:normal"></i>' : (page.icon || "📄");
+          const icoHtml = (typeof page.icon === "string" && page.icon.indexOf("ri-") === 0) ? '<i class="' + page.icon + '" style="font-style:normal"></i>' : (typeof page.icon === "string" && page.icon.indexOf("fi-") === 0) ? '<i class="fi ' + page.icon + '" style="font-style:normal"></i>' : (page.icon || "📄");
           el.innerHTML = `<span class="text-xs pointer-events-none">${icoHtml}</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">${page.title || "Sem título"}</span>`;
           range.insertNode(el);
 
