@@ -34,6 +34,9 @@ export default function MyApp(props: any) {
         /* Títulos usam a mesma fonte da interface (sem serifa) */
         .dc-serif { font-family: 'Hanken Grotesk', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif !important; letter-spacing: -0.015em; }
         .dc-hand { font-family: 'Caveat', ui-rounded, cursive; }
+        /* Título da página em preto (tema-aware) */
+        .dc-titleink { color: #191613; }
+        .dark .dc-titleink { color: #f2f0ea; }
         *::-webkit-scrollbar { width: 11px; height: 11px; }
         *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
         *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
@@ -3613,7 +3616,7 @@ function pageIconHtml(icon: any) {
 }
 function pageChipHtml(page: any) {
   const title = (page.title || "Sem título").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return '<span data-page-id="' + page.id + '" contenteditable="false" class="inline-flex items-center gap-1 text-primary font-semibold px-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer select-none transition-colors mx-1"><span class="text-xs pointer-events-none">' + pageIconHtml(page.icon) + '</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">' + title + '</span></span>&nbsp;';
+  return '<span data-page-id="' + page.id + '" contenteditable="false" class="dc-pagelink inline-flex items-baseline gap-1 rounded px-0.5 cursor-pointer select-none transition-colors hover:bg-accent"><span class="text-muted-foreground pointer-events-none" style="opacity:.8">' + pageIconHtml(page.icon) + '</span><span class="pointer-events-none font-medium text-foreground underline decoration-foreground/25 underline-offset-2">' + title + '</span></span>&nbsp;';
 }
 // Detecta se um bloco (recursivo) contém um link/menção para a página alvo.
 function blockLinksToId(b: any, targetId: string): boolean {
@@ -5185,12 +5188,12 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
           setDragId(null);
           setDropTargetId(null);
         }}
-        className={"flex items-center gap-1.5 py-1.5 px-2 rounded-[9px] transition-colors cursor-pointer group " + (active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-accent text-foreground/80") + " " + (dropTargetId === page.id ? "ring-2 ring-primary bg-primary/10" : "")}
+        className={"flex items-center gap-1 py-1 px-1.5 rounded-lg transition-colors cursor-pointer group " + (active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-accent text-foreground/80") + " " + (dropTargetId === page.id ? "ring-2 ring-primary bg-primary/10" : "")}
         onClick={() => onSelect(page.id)}
       >
         <button
           onClick={(e) => { e.stopPropagation(); if (hasChildren) setExpanded((x: any) => ({ ...x, [page.id]: !isOpen })); }}
-          className={"h-4 w-4 flex items-center justify-center shrink-0 transition-all " + (hasChildren ? "text-muted-foreground/70 hover:text-foreground " + (isOpen ? "rotate-90" : "") : "opacity-0")}
+          className={"h-3.5 w-3.5 flex items-center justify-center shrink-0 transition-all " + (hasChildren ? "text-muted-foreground/70 hover:text-foreground " + (isOpen ? "rotate-90" : "") : "opacity-0")}
           type="button"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
@@ -5219,7 +5222,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
         {!canEdit && hasChildren && (<span className="text-[10px] text-muted-foreground bg-muted/70 px-1.5 rounded-md shrink-0" title={children.length + " subpágina(s)"}>{children.length}</span>)}
       </div>
       {isOpen && hasChildren && (
-        <div className="ml-[19px] pl-[9px] border-l border-border">
+        <div className="ml-[8px] pl-[7px] border-l border-border">
           {(Array.isArray(children)?children:[]).map((c: any) => (
             <PageNode key={c.id} page={c} pages={pages} level={level + 1} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={viewActive} onMoveDialog={onMoveDialog} />
           ))}
@@ -5244,7 +5247,6 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
 
   const updateBlocks = (next: any[]) => onUpdate({ content: next });
   const blocks = page.content || [];
-  const subs = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === page.id && !p.deleted_at);
   const backlinks = (Array.isArray(pages)?pages:[]).filter((p: any) => p.id !== page.id && !p.deleted_at && pageLinksToId(p, page.id));
 
   const isCoverColor = page.cover_url?.startsWith("#");
@@ -5284,30 +5286,10 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           placeholder="Sem título"
           rows={1}
           disabled={!canEdit}
-          className="dc-serif w-full bg-transparent font-semibold outline-none resize-none border-0 p-0 mb-4 block text-foreground placeholder:text-muted-foreground/40"
+          className="dc-serif dc-titleink w-full bg-transparent font-bold outline-none resize-none border-0 p-0 mb-4 block placeholder:text-muted-foreground/40"
           style={{ fontSize: "46px", lineHeight: "1.08", minHeight: "58px" }}
         />
         <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
-
-        <div className="mt-12 pt-5 border-t border-border/60">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="dc-serif text-xl font-semibold text-foreground inline-flex items-center gap-2"><span>📁</span>Subpáginas {subs.length > 0 && <span className="text-xs text-muted-foreground font-normal bg-muted rounded-full px-2 py-0.5">{subs.length}</span>}</h3>
-            {canEdit && <button onClick={onCreateSubpage} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 hover:bg-accent px-2 py-1 rounded-md transition-colors" type="button"><span className="text-base font-bold leading-none">+</span>Nova subpágina</button>}
-          </div>
-          {subs.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">Nenhuma subpágina ainda. Use o botão acima para criar uma.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {(Array.isArray(subs)?subs:[]).map((s: any) => (
-                <button key={s.id} onClick={() => onSelectPage(s.id)} className="group w-full flex items-center gap-3 p-3 rounded-2xl border border-border hover:border-primary transition-all text-left hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-14px_rgba(91,69,217,0.45)]" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
-                  <span className="h-9 w-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ backgroundColor: pageTypeChip(s).bg, color: pageTypeChip(s).fg }}>{pageIconNode(s.icon)}</span>
-                  <span className="text-sm font-medium text-foreground truncate flex-1">{s.title || "Sem título"}</span>
-                  <svg className="opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
         {backlinks.length > 0 && (
           <div className="mt-8 pt-5 border-t border-border/60">
@@ -9014,12 +8996,11 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           range.deleteContents();
 
           const el = document.createElement("span");
-          el.className = "inline-flex items-center gap-1 text-primary font-semibold px-1 rounded bg-primary/10 hover:bg-primary/20 cursor-pointer select-none transition-colors mx-1";
+          el.className = "dc-pagelink inline-flex items-baseline gap-1 rounded px-0.5 cursor-pointer select-none transition-colors hover:bg-accent";
           el.dataset.pageId = page.id;
           el.contentEditable = "false";
-          const icoSvg = (typeof page.icon === "string" && page.icon.indexOf("ic:") === 0) ? ICON_SVGS[page.icon.slice(3)] : null;
-          const icoHtml = icoSvg ? '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-0.125em">' + icoSvg + '</svg>' : (typeof page.icon === "string" && page.icon.indexOf("ri-") === 0) ? '<i class="' + page.icon + '" style="font-style:normal"></i>' : (typeof page.icon === "string" && page.icon.indexOf("fi-") === 0) ? '<i class="fi ' + page.icon + '" style="font-style:normal"></i>' : (page.icon || "📄");
-          el.innerHTML = `<span class="text-xs pointer-events-none">${icoHtml}</span><span class="pointer-events-none underline decoration-primary/30 underline-offset-2">${page.title || "Sem título"}</span>`;
+          const icoHtml = pageIconHtml(page.icon);
+          el.innerHTML = `<span class="text-muted-foreground pointer-events-none" style="opacity:.8">${icoHtml}</span><span class="pointer-events-none font-medium text-foreground underline decoration-foreground/25 underline-offset-2">${(page.title || "Sem título")}</span>`;
           range.insertNode(el);
 
           const space = document.createTextNode(" ");
@@ -9653,18 +9634,29 @@ function BlockRenderer(props: any) {
 function useEditable(block: any, autoFocus: boolean, onAutoFocused: () => void) {
   const ref = useRef<HTMLDivElement | null>(null);
   const lastIdRef = useRef<string>("");
+  const lastHtmlRef = useRef<string>(block.html || "");
+  // Mantém o último html conhecido em sincronia com a DIGITAÇÃO deste campo.
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const onIn = () => { lastHtmlRef.current = el.innerHTML; };
+    el.addEventListener("input", onIn);
+    return () => el.removeEventListener("input", onIn);
+  }, []);
   useEffect(() => {
     if (ref.current && lastIdRef.current !== block.id + "-" + block.type) {
       ref.current.innerHTML = block.html || "";
       lastIdRef.current = block.id + "-" + block.type;
+      lastHtmlRef.current = block.html || "";
     }
   }, [block.id, block.type]);
-  // Resincroniza o DOM quando o html muda de fora (ex.: inserir link de página
-  // via "/") e o bloco não está focado — não mexe no cursor durante a digitação.
+  // Resincroniza o DOM quando o html muda de FORA (converter bloco e remover o
+  // "/...", inserir link de página, etc.). Compara com o que ESTE campo digitou:
+  // se for igual, a mudança veio da digitação e não mexemos no cursor.
   useEffect(() => {
-    if (ref.current && document.activeElement !== ref.current && (ref.current.innerHTML || "") !== (block.html || "")) {
-      ref.current.innerHTML = block.html || "";
-    }
+    const el = ref.current; if (!el) return;
+    if ((block.html || "") === lastHtmlRef.current) return;
+    el.innerHTML = block.html || "";
+    lastHtmlRef.current = block.html || "";
   }, [block.html]);
   useEffect(() => {
     if (autoFocus && ref.current) {
