@@ -5247,6 +5247,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
 
   const updateBlocks = (next: any[]) => onUpdate({ content: next });
   const blocks = page.content || [];
+  const subs = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === page.id && !p.deleted_at).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
   const backlinks = (Array.isArray(pages)?pages:[]).filter((p: any) => p.id !== page.id && !p.deleted_at && pageLinksToId(p, page.id));
 
   const isCoverColor = page.cover_url?.startsWith("#");
@@ -5290,6 +5291,43 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           style={{ fontSize: "46px", lineHeight: "1.08", minHeight: "58px" }}
         />
         <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
+
+        {(subs.length > 0 || canEdit) && (
+          <div className="mt-10 pt-5 border-t border-border/60">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="dc-serif text-xl font-semibold text-foreground inline-flex items-center gap-2"><span>📁</span>Subpáginas {subs.length > 0 && <span className="text-xs text-muted-foreground font-normal bg-muted rounded-full px-2 py-0.5">{subs.length}</span>}</h3>
+              {canEdit && <button onClick={onCreateSubpage} className="text-xs font-medium text-primary inline-flex items-center gap-1 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-colors" type="button"><span className="text-sm font-bold leading-none">+</span>Nova subpágina</button>}
+            </div>
+            {subs.length === 0 ? (
+              canEdit ? (
+                <button onClick={onCreateSubpage} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-accent/40 transition-colors text-sm" type="button">
+                  <span className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary text-base shrink-0 font-bold leading-none">+</span>
+                  Criar a primeira subpágina
+                </button>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">Nenhuma subpágina ainda.</p>
+              )
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(Array.isArray(subs)?subs:[]).map((s: any) => {
+                  const chip = pageTypeChip(s);
+                  const sc = (Array.isArray(pages)?pages:[]).filter((c: any) => c.parent_id === s.id && !c.deleted_at).length;
+                  const kind = isDiagramPage(s) ? "Diagrama" : isCanvasPage(s) ? "Caderno" : "Documento";
+                  return (
+                    <button key={s.id} onClick={() => onSelectPage(s.id)} className="group flex items-center gap-3 p-2.5 rounded-xl border border-border/70 hover:border-primary/40 transition-all text-left hover:bg-accent/40 hover:shadow-[0_10px_24px_-16px_rgba(91,69,217,0.5)]" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
+                      <span className="h-9 w-9 rounded-lg flex items-center justify-center text-base shrink-0" style={{ backgroundColor: chip.bg, color: chip.fg }}>{pageIconNode(s.icon)}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-foreground truncate">{s.title || "Sem título"}</span>
+                        <span className="block text-[11px] text-muted-foreground truncate">{kind}{sc > 0 ? " · " + sc + " subpágina" + (sc > 1 ? "s" : "") : ""}</span>
+                      </span>
+                      <svg className="opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 text-primary transition-all shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {backlinks.length > 0 && (
           <div className="mt-8 pt-5 border-t border-border/60">
@@ -9805,7 +9843,7 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
   // era o "/" que sobrava no primeiro item da lista.
   // Linhas que são só link de página empilham compactas (igual ao Notion).
   const linkOnly = block.type === "paragraph" && isPageLinkOnlyHtml(block.html);
-  const blockCls = linkOnly ? "text-[15px] leading-6 text-foreground py-px" : baseCls[block.type];
+  const blockCls = linkOnly ? "text-[15px] leading-5 text-foreground py-0" : baseCls[block.type];
   const inner = (
     <div key="ce" ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} className={"outline-none break-words " + blockCls + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
   );
