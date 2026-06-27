@@ -5222,7 +5222,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
         {!canEdit && hasChildren && (<span className="text-[10px] text-muted-foreground bg-muted/70 px-1.5 rounded-md shrink-0" title={children.length + " subpágina(s)"}>{children.length}</span>)}
       </div>
       {isOpen && hasChildren && (
-        <div className="ml-[8px] pl-[7px] border-l border-border">
+        <div className="ml-[13px] pl-[7px] border-l border-border">
           {(Array.isArray(children)?children:[]).map((c: any) => (
             <PageNode key={c.id} page={c} pages={pages} level={level + 1} activeId={activeId} expanded={expanded} setExpanded={setExpanded} onSelect={onSelect} onCreate={onCreate} onToggleFav={onToggleFav} onDelete={onDelete} onMove={onMove} onDuplicate={onDuplicate} onReorder={onReorder} dragId={dragId} setDragId={setDragId} dropTargetId={dropTargetId} setDropTargetId={setDropTargetId} canEdit={canEdit} viewActive={viewActive} onMoveDialog={onMoveDialog} />
           ))}
@@ -8917,6 +8917,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     if (mdBlocks.length === 1 && mdBlocks[0].type === "paragraph") {
       next[idx] = { ...cur, html: beforeHtml + mdBlocks[0].html + afterHtml };
       onChange(next);
+      setFocusId(currentBlockId); // recoloca o cursor após o resync do conteúdo
       return;
     }
 
@@ -9000,7 +9001,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           el.dataset.pageId = page.id;
           el.contentEditable = "false";
           const icoHtml = pageIconHtml(page.icon);
-          el.innerHTML = `<span class="text-muted-foreground pointer-events-none" style="opacity:.8">${icoHtml}</span><span class="pointer-events-none font-medium text-foreground underline decoration-foreground/25 underline-offset-2">${(page.title || "Sem título")}</span>`;
+          const safeTitle = (page.title || "Sem título").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          el.innerHTML = `<span class="text-muted-foreground pointer-events-none" style="opacity:.8">${icoHtml}</span><span class="pointer-events-none font-medium text-foreground underline decoration-foreground/25 underline-offset-2">${safeTitle}</span>`;
           range.insertNode(el);
 
           const space = document.createTextNode(" ");
@@ -9636,12 +9638,15 @@ function useEditable(block: any, autoFocus: boolean, onAutoFocused: () => void) 
   const lastIdRef = useRef<string>("");
   const lastHtmlRef = useRef<string>(block.html || "");
   // Mantém o último html conhecido em sincronia com a DIGITAÇÃO deste campo.
+  // Religa o listener quando o tipo muda, pois converter parágrafo↔lista recria
+  // o nó contentEditable (mesmo componente TextBlock) — senão o listener ficaria
+  // preso ao nó antigo e o cursor pularia ao digitar na lista convertida.
   useEffect(() => {
     const el = ref.current; if (!el) return;
     const onIn = () => { lastHtmlRef.current = el.innerHTML; };
     el.addEventListener("input", onIn);
     return () => el.removeEventListener("input", onIn);
-  }, []);
+  }, [block.id, block.type]);
   useEffect(() => {
     if (ref.current && lastIdRef.current !== block.id + "-" + block.type) {
       ref.current.innerHTML = block.html || "";
