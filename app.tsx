@@ -5094,6 +5094,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
 
       {/* Scroll */}
       <div
+        data-sbscroll
         className="flex-1 overflow-y-auto px-2 pt-3.5 pb-4"
         onDragOver={(e) => { e.preventDefault(); setDropTargetId("__root__"); }}
         onDrop={(e) => handleDropOnList(e, null)}
@@ -5132,7 +5133,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
           ))}
           {roots.length === 0 && (<div className="px-2 py-3 text-xs text-muted-foreground italic text-center">Nenhuma página ainda.<br />{canEdit && "Clique em + para criar."}</div>)}
         </div>
-        <div className={"h-10 w-full mt-1 rounded-md transition-colors " + (dropTargetId === "__root__" ? "bg-primary/10 border border-primary/40" : "")} />
+        <div data-droproot className={"h-10 w-full mt-1 rounded-md transition-colors " + (dropTargetId === "__root__" ? "bg-primary/10 border border-primary/40" : "")} />
       </div>
 
       {/* Footer — Lixeira */}
@@ -5153,10 +5154,109 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
   const hasChildren = children.length > 0;
   const active = activeId === page.id && viewActive;
 
+  // Arrastar para reordenar no TOQUE (iPad/celular). O HTML5 drag-and-drop não
+  // dispara em telas de toque, então implementamos um arraste por toque-longo:
+  // segurar 250ms inicia o arraste; antes disso o movimento rola a lista normal.
+  const touchRef = useRef<any>(null);
+  const justDraggedRef = useRef(false);
+  const coarse = typeof window !== "undefined" && !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  // Se o nó desmontar no meio de um arraste (ex.: o drop re-renderiza a árvore),
+  // garante que os listeners no document e o rAF de auto-scroll sejam removidos.
+  useEffect(() => () => { const st = touchRef.current; if (st && st.cleanup) st.cleanup(); }, []);
+
+  const isDescendantOf = (ancId: string, targetId: string): boolean => {
+    if (ancId === targetId) return true;
+    const kids = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === ancId);
+    for (const k of kids) { if (isDescendantOf(k.id, targetId)) return true; }
+    return false;
+  };
+
+  const computeTouchAction = (clientX: number, clientY: number) => {
+    const elx = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    if (!elx || !elx.closest) return null;
+    const row = elx.closest("[data-id]") as HTMLElement | null;
+    if (!row) { return elx.closest("[data-droproot]") ? { type: "root" } : null; }
+    const tid = row.getAttribute("data-id");
+    if (!tid || tid === page.id || isDescendantOf(page.id, tid)) return null;
+    const targetPage = (Array.isArray(pages)?pages:[]).find((p: any) => p.id === tid);
+    if (!targetPage) return null;
+    const rect = row.getBoundingClientRect();
+    const ratio = (clientY - rect.top) / (rect.height || 1);
+    const sibs = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === targetPage.parent_id && !p.deleted_at).sort((a: any, b: any) => a.sort_order - b.sort_order);
+    const baseIdx = sibs.findIndex((p: any) => p.id === tid);
+    if (ratio < 0.3) return { type: "reorder", parentId: targetPage.parent_id, index: baseIdx, targetId: tid };
+    if (ratio > 0.7) return { type: "reorder", parentId: targetPage.parent_id, index: baseIdx + 1, targetId: tid };
+    return { type: "move", parentId: tid, targetId: tid };
+  };
+
+  const startTouchDrag = (t: any) => {
+    if (!canEdit) return;
+    if (touchRef.current && touchRef.current.cleanup) touchRef.current.cleanup();
+    const st: any = touchRef.current = { x: t.clientX, y: t.clientY, lastX: t.clientX, lastY: t.clientY, dragging: false, action: null, raf: 0, scrollEl: null };
+    const mv = (ev: any) => {
+      const t2 = ev.touches && ev.touches[0]; if (!t2) return;
+      st.lastX = t2.clientX; st.lastY = t2.clientY;
+      if (!st.dragging) {
+        if (Math.abs(t2.clientX - st.x) > 9 || Math.abs(t2.clientY - st.y) > 9) st.cleanup(); // moveu antes do toque-longo: é rolagem
+        return;
+      }
+      ev.preventDefault(); // arrastando: bloqueia a rolagem da lista
+      if (!st.scrollEl) { const e0 = document.elementFromPoint(t2.clientX, t2.clientY) as HTMLElement | null; st.scrollEl = (e0 && e0.closest && e0.closest("[data-sbscroll]")) || null; }
+      const act = computeTouchAction(t2.clientX, t2.clientY);
+      st.action = act;
+      setDropTargetId(act ? ((act as any).targetId || ((act as any).type === "root" ? "__root__" : null)) : null);
+    };
+    const en = (ev: any) => {
+      if (st.dragging) {
+        try { ev.preventDefault(); } catch (e) {}
+        const act = st.action;
+        if (act) {
+          if ((act as any).type === "move") onMove(page.id, (act as any).parentId);
+          else if ((act as any).type === "reorder") onReorder(page.id, (act as any).parentId, (act as any).index);
+          else if ((act as any).type === "root") onMove(page.id, null);
+        }
+        justDraggedRef.current = true; // impede o clique sintético de selecionar a página
+        setTimeout(() => { justDraggedRef.current = false; }, 350);
+      }
+      st.cleanup();
+    };
+    const autoScroll = () => {
+      if (!st.dragging) { st.raf = 0; return; }
+      const sc = st.scrollEl;
+      if (sc && st.lastY != null) {
+        const r = sc.getBoundingClientRect(); const EDGE = 52, STEP = 11;
+        if (st.lastY < r.top + EDGE) sc.scrollTop -= STEP;
+        else if (st.lastY > r.bottom - EDGE) sc.scrollTop += STEP;
+      }
+      st.raf = requestAnimationFrame(autoScroll);
+    };
+    st.cleanup = () => {
+      st.dragging = false;
+      if (st.timer) clearTimeout(st.timer);
+      if (st.raf) cancelAnimationFrame(st.raf);
+      document.removeEventListener("touchmove", mv);
+      document.removeEventListener("touchend", en);
+      document.removeEventListener("touchcancel", en);
+      setDragId(null); setDropTargetId(null);
+      touchRef.current = null;
+    };
+    st.timer = setTimeout(() => {
+      st.dragging = true;
+      setDragId(page.id);
+      try { (navigator as any).vibrate && (navigator as any).vibrate(12); } catch (e) {}
+      st.raf = requestAnimationFrame(autoScroll);
+    }, 250);
+    document.addEventListener("touchmove", mv, { passive: false });
+    document.addEventListener("touchend", en, { passive: false });
+    document.addEventListener("touchcancel", en, { passive: false });
+  };
+
   return (
     <div data-id={page.id}>
       <div
-        draggable={canEdit}
+        draggable={canEdit && !coarse}
+        onTouchStart={(e) => { if (canEdit && e.touches.length === 1) startTouchDrag(e.touches[0]); }}
+        style={{ WebkitTouchCallout: "none" } as any}
         onDragStart={(e) => { if (!canEdit) return; setDragId(page.id); e.dataTransfer.effectAllowed = "move"; }}
         onDragEnd={() => { setDragId(null); setDropTargetId(null); }}
         onDragOver={(e) => { if (dragId && dragId !== page.id) { e.preventDefault(); setDropTargetId(page.id); } }}
@@ -5188,8 +5288,8 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
           setDragId(null);
           setDropTargetId(null);
         }}
-        className={"flex items-center gap-1 py-1 px-1.5 rounded-lg transition-colors cursor-pointer group " + (active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-accent text-foreground/80") + " " + (dropTargetId === page.id ? "ring-2 ring-primary bg-primary/10" : "")}
-        onClick={() => onSelect(page.id)}
+        className={"flex items-center gap-1 py-1 px-1.5 rounded-lg transition-colors cursor-pointer group select-none " + (active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-accent text-foreground/80") + " " + (dropTargetId === page.id ? "ring-2 ring-primary bg-primary/10" : "") + (dragId === page.id ? " opacity-40" : "")}
+        onClick={() => { if (justDraggedRef.current) { justDraggedRef.current = false; return; } onSelect(page.id); }}
       >
         <button
           onClick={(e) => { e.stopPropagation(); if (hasChildren) setExpanded((x: any) => ({ ...x, [page.id]: !isOpen })); }}
