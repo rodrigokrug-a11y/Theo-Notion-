@@ -3943,6 +3943,40 @@ function arrowHeadAt(x1: number, y1: number, x2: number, y2: number, s: number) 
     bx: R(bx), by: R(by),
   };
 }
+// Roteamento ortogonal (dobras retas a 90°, estilo organograma). Sai pela face
+// do nó no eixo dominante e dobra no meio do caminho. Respeita âncoras fixas.
+function orthoRouteFor(a: any, b: any, ed: any) {
+  const ca = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, cb = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+  const aFix = ed.fromAnchor ? { x: a.x + ed.fromAnchor.ax * a.w, y: a.y + ed.fromAnchor.ay * a.h } : null;
+  const bFix = ed.toAnchor ? { x: b.x + ed.toAnchor.ax * b.w, y: b.y + ed.toAnchor.ay * b.h } : null;
+  const dx = cb.x - ca.x, dy = cb.y - ca.y;
+  let p1: any, p2: any, pts: any[];
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    p1 = aFix || { x: ca.x, y: dy >= 0 ? a.y + a.h : a.y };
+    p2 = bFix || { x: cb.x, y: dy >= 0 ? b.y : b.y + b.h };
+    const my = (p1.y + p2.y) / 2;
+    pts = [p1, { x: p1.x, y: my }, { x: p2.x, y: my }, p2];
+  } else {
+    p1 = aFix || { x: dx >= 0 ? a.x + a.w : a.x, y: ca.y };
+    p2 = bFix || { x: dx >= 0 ? b.x : b.x + b.w, y: cb.y };
+    const mx = (p1.x + p2.x) / 2;
+    pts = [p1, { x: mx, y: p1.y }, { x: mx, y: p2.y }, p2];
+  }
+  return { p1, p2, pts, cp: { x: (pts[1].x + pts[2].x) / 2, y: (pts[1].y + pts[2].y) / 2 }, ortho: true, cv: 0 };
+}
+// Monta o path/pontas de uma aresta ortogonal a partir do geom (g.pts).
+function orthoEdgeRender(g: any, ed: any, hsz: number) {
+  const pts = (g.pts || []).map((p: any) => ({ x: p.x, y: p.y }));
+  const n = pts.length;
+  if (n < 2) return { d: "", ah: null, sh: null, labelMid: g.cp };
+  const ah = ed.arrowEnd !== false ? arrowHeadAt(pts[n - 2].x, pts[n - 2].y, pts[n - 1].x, pts[n - 1].y, hsz) : null;
+  const sh = ed.arrowStart ? arrowHeadAt(pts[1].x, pts[1].y, pts[0].x, pts[0].y, hsz) : null;
+  const dp = pts.slice();
+  if (ah) dp[n - 1] = { x: ah.bx, y: ah.by };
+  if (sh) dp[0] = { x: sh.bx, y: sh.by };
+  const d = dp.map((p: any, i: number) => (i === 0 ? "M " : "L ") + p.x + " " + p.y).join(" ");
+  return { d, ah, sh, labelMid: g.cp };
+}
 function pointInBox(p: any, b: any, pad = 0) {
   return p.x >= b.x - pad && p.x <= b.x + b.w + pad && p.y >= b.y - pad && p.y <= b.y + b.h + pad;
 }
@@ -5606,6 +5640,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const edgeGeom = (ed: any) => {
     const a = nodeById(ed.from), b = nodeById(ed.to);
     if (!a || !b) return null;
+    if (ed.bend === "ortho") return orthoRouteFor(a, b, ed);
     const ca = centerOf(a), cb = centerOf(b);
     const aFix = anchorPt(a, ed.fromAnchor), bFix = anchorPt(b, ed.toAnchor);
     // Perpendicular fixa pelo par (não depende do sentido) → ida e volta ficam em lados opostos
@@ -5634,6 +5669,11 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const g = edgeGeom(ed);
     if (!g) return false;
     const thr = 9 / scale;
+    if (g.ortho) {
+      const pts = g.pts || [];
+      for (let i = 1; i < pts.length; i++) { if (distToSeg(p, pts[i - 1], pts[i]) <= thr) return true; }
+      return false;
+    }
     if (!g.cv) return distToSeg(p, g.p1, g.p2) <= thr;
     let prev = g.p1;
     for (let i = 1; i <= 14; i++) {
@@ -5932,14 +5972,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const col = ed.color || "#64748b";
     const sw = ed.sw || 2, hsz = sw * 4 + 3;
     const dash = ed.style === "dashed" ? ' stroke-dasharray="' + (sw * 3) + " " + (sw * 2.5) + '"' : ed.style === "dotted" ? ' stroke-dasharray="' + Math.max(0.4, sw * 0.1) + " " + (sw * 2.2) + '"' : "";
-    const endTan = g.cv ? g.cp : g.p1, startTan = g.cv ? g.cp : g.p2;
-    const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
-    const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
-    const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
-    let out = '<path d="' + d + '" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linecap="round"' + dash + '/>';
+    let d: string, ah: any, sh: any, labelMid: any;
+    if (g.ortho) { const o = orthoEdgeRender(g, ed, hsz); d = o.d; ah = o.ah; sh = o.sh; labelMid = o.labelMid; }
+    else {
+      const endTan = g.cv ? g.cp : g.p1, startTan = g.cv ? g.cp : g.p2;
+      ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
+      sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
+      d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+      labelMid = bezierPt(g.p1, g.cp, g.p2, 0.5);
+    }
+    let out = '<path d="' + d + '" stroke="' + col + '" stroke-width="' + sw + '" fill="none" stroke-linecap="round" stroke-linejoin="round"' + dash + '/>';
     if (ah) out += '<polygon points="' + ah.poly + '" fill="' + col + '"/>';
     if (sh) out += '<polygon points="' + sh.poly + '" fill="' + col + '"/>';
-    if (ed.label) { const mid = bezierPt(g.p1, g.cp, g.p2, 0.5); out += '<text x="' + mid.x + '" y="' + mid.y + '" font-size="12" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" text-anchor="middle" dominant-baseline="middle">' + xmlEsc(ed.label) + '</text>'; }
+    if (ed.label) { out += '<text x="' + labelMid.x + '" y="' + labelMid.y + '" font-size="12" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" text-anchor="middle" dominant-baseline="middle">' + xmlEsc(ed.label) + '</text>'; }
     return out;
   };
   const buildDiagramSvg = () => {
@@ -6110,17 +6155,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const R = 13 / scale;
         if (Math.hypot(p.x - g.p1.x, p.y - g.p1.y) <= R) { gestureRef.current = { kind: "edgept", id: ed.id, end: "from", moved: false, snap: snap() }; return; }
         if (Math.hypot(p.x - g.p2.x, p.y - g.p2.y) <= R) { gestureRef.current = { kind: "edgept", id: ed.id, end: "to", moved: false, snap: snap() }; return; }
-        const apex = bezierPt(g.p1, g.cp, g.p2, 0.5);
-        if (Math.hypot(p.x - apex.x, p.y - apex.y) <= R) {
-          const a = nodeById(ed.from), b = nodeById(ed.to);
-          const ca = centerOf(a), cb = centerOf(b);
-          const aFix = anchorPt(a, ed.fromAnchor), bFix = anchorPt(b, ed.toAnchor);
-          const lowFirst = ed.from < ed.to;
-          const PA = lowFirst ? (aFix || ca) : (bFix || cb), PB = lowFirst ? (bFix || cb) : (aFix || ca);
-          const vx = PB.x - PA.x, vy = PB.y - PA.y, vl = Math.hypot(vx, vy) || 1;
-          const bp1 = aFix || borderPoint(a, cb.x, cb.y), bp2 = bFix || borderPoint(b, ca.x, ca.y);
-          gestureRef.current = { kind: "edgecurve", id: ed.id, mbx: (bp1.x + bp2.x) / 2, mby: (bp1.y + bp2.y) / 2, nx: -vy / vl, ny: vx / vl, moved: false, snap: snap() };
-          return;
+        if (ed.bend !== "ortho") {
+          const apex = bezierPt(g.p1, g.cp, g.p2, 0.5);
+          if (Math.hypot(p.x - apex.x, p.y - apex.y) <= R) {
+            const a = nodeById(ed.from), b = nodeById(ed.to);
+            const ca = centerOf(a), cb = centerOf(b);
+            const aFix = anchorPt(a, ed.fromAnchor), bFix = anchorPt(b, ed.toAnchor);
+            const lowFirst = ed.from < ed.to;
+            const PA = lowFirst ? (aFix || ca) : (bFix || cb), PB = lowFirst ? (bFix || cb) : (aFix || ca);
+            const vx = PB.x - PA.x, vy = PB.y - PA.y, vl = Math.hypot(vx, vy) || 1;
+            const bp1 = aFix || borderPoint(a, cb.x, cb.y), bp2 = bFix || borderPoint(b, ca.x, ca.y);
+            gestureRef.current = { kind: "edgecurve", id: ed.id, mbx: (bp1.x + bp2.x) / 2, mby: (bp1.y + bp2.y) / 2, nx: -vy / vl, ny: vx / vl, moved: false, snap: snap() };
+            return;
+          }
         }
       }
     }
@@ -6388,18 +6435,22 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const hsz = sw * 4 + 3; // ponta proporcional à espessura
     const dash = ed.style === "dashed" ? (sw * 3) + " " + (sw * 2.5) : ed.style === "dotted" ? (Math.max(0.4, sw * 0.1)) + " " + (sw * 2.2) : undefined;
     // Ponta da seta orientada pela tangente da curva (controle → ponta)
-    const endTan = g.cv ? g.cp : g.p1;
-    const startTan = g.cv ? g.cp : g.p2;
-    const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
-    const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
-    const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
-    const mid = bezierPt(g.p1, g.cp, g.p2, 0.5);
+    let d: string, ah: any, sh: any, mid: any;
+    if (g.ortho) { const o = orthoEdgeRender(g, ed, hsz); d = o.d; ah = o.ah; sh = o.sh; mid = o.labelMid; }
+    else {
+      const endTan = g.cv ? g.cp : g.p1;
+      const startTan = g.cv ? g.cp : g.p2;
+      ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
+      sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
+      d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+      mid = bezierPt(g.p1, g.cp, g.p2, 0.5);
+    }
     const mx = mid.x, my = mid.y;
     const isSel = selected && selected.type === "edge" && selected.id === ed.id;
     return (
       <g key={ed.id}>
-        {isSel && <path d={d} stroke="hsl(var(--primary))" strokeWidth={sw + 5} fill="none" opacity={0.25} strokeLinecap="round" />}
-        <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={dash} />
+        {isSel && <path d={d} stroke="hsl(var(--primary))" strokeWidth={sw + 5} fill="none" opacity={0.25} strokeLinecap="round" strokeLinejoin="round" />}
+        <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} />
         {ah && <polygon points={ah.poly} fill={col} />}
         {sh && <polygon points={sh.poly} fill={col} />}
         {ed.label && !(editing && editing.id === ed.id) && (
@@ -6535,13 +6586,14 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
             const ed = edgesRef.current.find((x: any) => x.id === selected.id);
             const g = ed ? edgeGeom(ed) : null;
             if (!g) return null;
-            const apex = bezierPt(g.p1, g.cp, g.p2, 0.5);
+            const isOrtho = ed.bend === "ortho";
+            const apex = isOrtho ? null : bezierPt(g.p1, g.cp, g.p2, 0.5);
             const r = 6 / scale;
             return (
               <g>
                 <circle cx={g.p1.x} cy={g.p1.y} r={r} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.8 / scale} />
                 <circle cx={g.p2.x} cy={g.p2.y} r={r} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.8 / scale} />
-                <circle cx={apex.x} cy={apex.y} r={r * 1.05} fill="hsl(var(--primary))" stroke="#ffffff" strokeWidth={1.6 / scale} />
+                {apex && <circle cx={apex.x} cy={apex.y} r={r * 1.05} fill="hsl(var(--primary))" stroke="#ffffff" strokeWidth={1.6 / scale} />}
               </g>
             );
           })()}
@@ -6577,7 +6629,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const ed = edgesRef.current.find((x: any) => x.id === editing.id);
         const g = ed ? edgeGeom(ed) : null;
         if (!g) return null;
-        const mid = bezierPt(g.p1, g.cp, g.p2, 0.5); const mx = mid.x, my = mid.y;
+        const mid = g.ortho ? g.cp : bezierPt(g.p1, g.cp, g.p2, 0.5); const mx = mid.x, my = mid.y;
         return (
           <div className="absolute z-40" style={{ left: mx * scale + tx - 70, top: my * scale + ty - 14 }} onPointerDown={(e) => e.stopPropagation()}>
             <input
@@ -6784,6 +6836,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const style = ed.style || "solid";
         const sw = ed.sw || 2;
         const cur = ed.curve != null ? ed.curve : 0;
+        const bend = ed.bend === "ortho" ? "ortho" : "curve";
         const seg = (active: boolean) => "h-7 min-w-[1.9rem] px-1 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors " + (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent");
         const EDGE_COLORS = ["#64748b", "#0f172a", "#2563eb", "#16a34a", "#dc2626", "#ea580c", "#9333ea"];
         return (
@@ -6812,12 +6865,22 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               <button onClick={() => patchEdge({ style: "dotted" })} className={seg(style === "dotted")} title="Pontilhada" type="button">⋯</button>
             </div>
             <div className="w-px h-5 bg-border" />
-            {/* Curvatura */}
-            <div className="flex items-center gap-1 px-1" title="Curvar a seta (arraste); 0 = reta">
-              <span className="text-xs">〰️</span>
-              <input type="range" min={-160} max={160} step={4} value={cur} onChange={(e) => patchEdge({ curve: parseFloat(e.target.value) })} className="w-16 accent-primary" />
-              <button onClick={() => patchEdge({ curve: 0 })} className="h-7 px-2 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-accent transition-colors" title="Deixar reta" type="button">Reta</button>
+            {/* Tipo de dobra: curva/reta vs ortogonal (organograma) */}
+            <div className="flex items-center gap-0.5" title="Tipo de conexão">
+              <button onClick={() => patchEdge({ bend: "curve" })} className={seg(bend !== "ortho")} title="Curva / reta" type="button"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round"><path d="M2 12c5 0 4-8 12-8" /></svg></button>
+              <button onClick={() => patchEdge({ bend: "ortho" })} className={seg(bend === "ortho")} title="Dobra reta (organograma)" type="button"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M2 13V8h12V3" /></svg></button>
             </div>
+            {bend !== "ortho" && (
+              <>
+                <div className="w-px h-5 bg-border" />
+                {/* Curvatura */}
+                <div className="flex items-center gap-1 px-1" title="Curvar a seta (arraste); 0 = reta">
+                  <span className="text-xs">〰️</span>
+                  <input type="range" min={-160} max={160} step={4} value={cur} onChange={(e) => patchEdge({ curve: parseFloat(e.target.value) })} className="w-16 accent-primary" />
+                  <button onClick={() => patchEdge({ curve: 0 })} className="h-7 px-2 rounded-lg text-[11px] font-semibold text-muted-foreground hover:bg-accent transition-colors" title="Deixar reta" type="button">Reta</button>
+                </div>
+              </>
+            )}
             <div className="w-px h-5 bg-border" />
             {/* Cor da seta */}
             <div className="flex items-center gap-0.5" title="Cor da seta">
@@ -9437,6 +9500,7 @@ function dgAnchorPt(n: any, anc: any) { return anc ? { x: n.x + anc.ax * n.w, y:
 function dgEdgeGeom(ed: any, nodes: any[], edges: any[]) {
   const a = nodes.find((n: any) => n.id === ed.from), b = nodes.find((n: any) => n.id === ed.to);
   if (!a || !b) return null;
+  if (ed.bend === "ortho") return orthoRouteFor(a, b, ed);
   const ca = dgCenter(a), cb = dgCenter(b);
   const aFix = dgAnchorPt(a, ed.fromAnchor), bFix = dgAnchorPt(b, ed.toAnchor);
   const lowFirst = ed.from < ed.to;
@@ -9474,13 +9538,17 @@ function DiagramPreview({ content }: any) {
         const sw = ed.sw || 2;
         const hsz = sw * 4 + 3;
         const dash = ed.style === "dashed" ? (sw * 3) + " " + (sw * 2.5) : ed.style === "dotted" ? (Math.max(0.4, sw * 0.1)) + " " + (sw * 2.2) : undefined;
-        const endTan = g.cv ? g.cp : g.p1, startTan = g.cv ? g.cp : g.p2;
-        const ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
-        const sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
-        const d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+        let d: string, ah: any, sh: any;
+        if (g.ortho) { const o = orthoEdgeRender(g, ed, hsz); d = o.d; ah = o.ah; sh = o.sh; }
+        else {
+          const endTan = g.cv ? g.cp : g.p1, startTan = g.cv ? g.cp : g.p2;
+          ah = ed.arrowEnd !== false ? arrowHeadAt(endTan.x, endTan.y, g.p2.x, g.p2.y, hsz) : null;
+          sh = ed.arrowStart ? arrowHeadAt(startTan.x, startTan.y, g.p1.x, g.p1.y, hsz) : null;
+          d = "M " + g.p1.x + " " + g.p1.y + (g.cv ? " Q " + g.cp.x + " " + g.cp.y + " " + g.p2.x + " " + g.p2.y : " L " + g.p2.x + " " + g.p2.y);
+        }
         return (
           <g key={ed.id}>
-            <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={dash} />
+            <path d={d} stroke={col} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={dash} />
             {ah && <polygon points={ah.poly} fill={col} />}
             {sh && <polygon points={sh.poly} fill={col} />}
           </g>
