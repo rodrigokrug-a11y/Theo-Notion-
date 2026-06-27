@@ -5293,39 +5293,29 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
         <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
 
         {(subs.length > 0 || canEdit) && (
-          <div className="mt-10 pt-5 border-t border-border/60">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="dc-serif text-xl font-semibold text-foreground inline-flex items-center gap-2"><span>📁</span>Subpáginas {subs.length > 0 && <span className="text-xs text-muted-foreground font-normal bg-muted rounded-full px-2 py-0.5">{subs.length}</span>}</h3>
-              {canEdit && <button onClick={onCreateSubpage} className="text-xs font-medium text-primary inline-flex items-center gap-1 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-colors" type="button"><span className="text-sm font-bold leading-none">+</span>Nova subpágina</button>}
-            </div>
-            {subs.length === 0 ? (
-              canEdit ? (
-                <button onClick={onCreateSubpage} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-accent/40 transition-colors text-sm" type="button">
-                  <span className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary/10 text-primary text-base shrink-0 font-bold leading-none">+</span>
-                  Criar a primeira subpágina
+          <div className="mt-8 pt-5 border-t border-border/60">
+            <h3 className="dc-serif text-xl font-semibold text-foreground inline-flex items-center gap-2 mb-2"><span aria-hidden="true">📁</span>Subpáginas {subs.length > 0 && <span className="text-xs text-muted-foreground font-normal bg-muted rounded-full px-2 py-0.5">{subs.length}</span>}</h3>
+            <div className="space-y-0.5">
+              {(Array.isArray(subs)?subs:[]).map((s: any) => {
+                const chip = pageTypeChip(s);
+                const sc = (Array.isArray(pages)?pages:[]).filter((c: any) => c.parent_id === s.id && !c.deleted_at).length;
+                const kind = isDiagramPage(s) ? "Diagrama" : isCanvasPage(s) ? "Caderno" : "Documento";
+                return (
+                  <button key={s.id} onClick={() => onSelectPage(s.id)} title={kind} className="group w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-accent/60 transition-colors" type="button">
+                    <span aria-hidden="true" className="h-7 w-7 rounded-md flex items-center justify-center text-[13px] shrink-0" style={{ backgroundColor: chip.bg, color: chip.fg }}>{pageIconNode(s.icon) || "📄"}</span>
+                    <span className="text-sm text-foreground truncate flex-1 group-hover:text-primary transition-colors">{s.title || "Sem título"}</span>
+                    {sc > 0 && <span className="text-[11px] text-muted-foreground bg-muted/70 px-1.5 py-0.5 rounded-md shrink-0" title={sc + " subpágina" + (sc > 1 ? "s" : "")}>{sc}</span>}
+                    <span aria-hidden="true" className="text-muted-foreground opacity-0 group-hover:opacity-100 text-xs shrink-0">›</span>
+                  </button>
+                );
+              })}
+              {canEdit && (
+                <button onClick={onCreateSubpage} className="group w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-muted-foreground hover:bg-accent/60 hover:text-foreground transition-colors" type="button">
+                  <span aria-hidden="true" className="h-7 w-7 rounded-md flex items-center justify-center bg-primary/10 text-primary text-base font-bold leading-none shrink-0">+</span>
+                  <span className="text-sm">{subs.length === 0 ? "Criar a primeira subpágina" : "Adicionar subpágina"}</span>
                 </button>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">Nenhuma subpágina ainda.</p>
-              )
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {(Array.isArray(subs)?subs:[]).map((s: any) => {
-                  const chip = pageTypeChip(s);
-                  const sc = (Array.isArray(pages)?pages:[]).filter((c: any) => c.parent_id === s.id && !c.deleted_at).length;
-                  const kind = isDiagramPage(s) ? "Diagrama" : isCanvasPage(s) ? "Caderno" : "Documento";
-                  return (
-                    <button key={s.id} onClick={() => onSelectPage(s.id)} className="group flex items-center gap-3 p-2.5 rounded-xl border border-border/70 hover:border-primary/40 transition-all text-left hover:bg-accent/40 hover:shadow-[0_10px_24px_-16px_rgba(91,69,217,0.5)]" style={{ backgroundColor: "hsl(var(--card))" }} type="button">
-                      <span className="h-9 w-9 rounded-lg flex items-center justify-center text-base shrink-0" style={{ backgroundColor: chip.bg, color: chip.fg }}>{pageIconNode(s.icon)}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-foreground truncate">{s.title || "Sem título"}</span>
-                        <span className="block text-[11px] text-muted-foreground truncate">{kind}{sc > 0 ? " · " + sc + " subpágina" + (sc > 1 ? "s" : "") : ""}</span>
-                      </span>
-                      <svg className="opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 text-primary transition-all shrink-0" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
