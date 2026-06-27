@@ -3950,8 +3950,10 @@ function orthoRouteFor(a: any, b: any, ed: any) {
   const aFix = ed.fromAnchor ? { x: a.x + ed.fromAnchor.ax * a.w, y: a.y + ed.fromAnchor.ay * a.h } : null;
   const bFix = ed.toAnchor ? { x: b.x + ed.toAnchor.ax * b.w, y: b.y + ed.toAnchor.ay * b.h } : null;
   const dx = cb.x - ca.x, dy = cb.y - ca.y;
+  // Eixo da dobra: "v"/"h" força (organograma usa "v"); senão escolhe o dominante.
+  const vertical = ed.bendAxis === "v" ? true : ed.bendAxis === "h" ? false : (Math.abs(dy) >= Math.abs(dx));
   let p1: any, p2: any, pts: any[];
-  if (Math.abs(dy) >= Math.abs(dx)) {
+  if (vertical) {
     p1 = aFix || { x: ca.x, y: dy >= 0 ? a.y + a.h : a.y };
     p2 = bFix || { x: cb.x, y: dy >= 0 ? b.y : b.y + b.h };
     const my = (p1.y + p2.y) / 2;
@@ -5534,6 +5536,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [future, setFuture] = useState<any[]>([]);
   const [importing, setImporting] = useState<string | null>(null);
   const [exportMenu, setExportMenu] = useState(false);
+  const [orgOpen, setOrgOpen] = useState(false);
+  const [orgText, setOrgText] = useState("");
   const dgFileRef = useRef<HTMLInputElement | null>(null);
   const { toast } = BeaUI.useToast();
 
@@ -5713,6 +5717,90 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const cy = r ? (r.height / 2 - ty) / scale : 200;
     addNodeAt(shape, { x: cx, y: cy });
   };
+  // Organograma a partir de texto: indentação (Tab/espaços) define a hierarquia,
+  // ou setas estilo Mermaid (Chefe --> Subordinado). Gera nós editáveis + setas
+  // ortogonais com layout em árvore (de cima para baixo).
+  const parseOrgPart = (s: string) => {
+    let t = (s || "").trim();
+    const m = t.match(/^([\w.-]+)\s*[\[\(\{]+\s*(.+?)\s*[\]\)\}]+$/); // id[Rótulo]
+    if (m) return { key: m[1], label: m[2] };
+    return { key: t, label: t };
+  };
+  const buildOrgTree = (text: string) => {
+    const lines = (text || "").split("\n").map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim() !== "");
+    if (!lines.length) return null;
+    const hasArrows = lines.some((l) => /-{1,2}>|→/.test(l));
+    const reg = new Map<string, any>();
+    const roots: any[] = [];
+    const ensure = (key: string, label: string) => {
+      if (!reg.has(key)) reg.set(key, { id: uid(), label: label || key, children: [], parent: null });
+      const n = reg.get(key); if (label && (n.label === key || !n.label)) n.label = label; return n;
+    };
+    if (hasArrows) {
+      for (const raw of lines) {
+        let l = raw.trim();
+        if (/^(graph|flowchart)\b/i.test(l)) { l = l.replace(/^(graph|flowchart)\s+\w+/i, "").trim(); if (!l) continue; }
+        l = l.replace(/;+$/, "").trim();
+        const parts = l.split(/-{1,2}>|→/).map((p) => p.trim()).filter((p) => p !== "");
+        if (parts.length < 2) { if (parts[0]) { const p = parseOrgPart(parts[0]); ensure(p.key, p.label); } continue; }
+        let prev: any = null;
+        for (const part of parts) {
+          const pp = parseOrgPart(part); const node = ensure(pp.key, pp.label);
+          if (prev && node !== prev && node.parent == null && prev !== node) { node.parent = prev; prev.children.push(node); }
+          prev = node;
+        }
+      }
+      for (const n of reg.values()) if (!n.parent) roots.push(n);
+    } else {
+      const stack: any[] = [];
+      const indentOf = (s: string) => { const m = s.match(/^[\t ]*/); let w = 0; for (const ch of (m ? m[0] : "")) w += ch === "\t" ? 4 : 1; return w; };
+      for (const raw of lines) {
+        const indent = indentOf(raw);
+        // No modo indentação não há IDs: o rótulo é o texto cru (preserva "( )", "[ ]").
+        const label = raw.trim().replace(/^[-*•]\s+/, "");
+        if (!label) continue;
+        const node = { id: uid(), label, children: [], parent: null as any };
+        while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+        if (stack.length) { node.parent = stack[stack.length - 1].node; stack[stack.length - 1].node.children.push(node); }
+        else roots.push(node);
+        stack.push({ indent, node });
+      }
+    }
+    return roots.length ? roots : null;
+  };
+  const createOrgChart = (text: string) => {
+    const roots = buildOrgTree(text);
+    if (!roots) { toast("Digite a estrutura do organograma", "error"); return false; }
+    const W = 158, H = 58, HGAP = 26, VGAP = 64;
+    let cursor = 0;
+    const place = (node: any, depth: number) => {
+      node._y = depth * (H + VGAP);
+      if (!node.children.length) { node._x = cursor; cursor += W + HGAP; }
+      else { node.children.forEach((c: any) => place(c, depth + 1)); node._x = (node.children[0]._x + node.children[node.children.length - 1]._x) / 2; }
+    };
+    roots.forEach((r: any) => place(r, 0));
+    const all: any[] = [];
+    const collect = (n: any) => { all.push(n); n.children.forEach(collect); };
+    roots.forEach(collect);
+    if (all.length > 400) { toast("Organograma muito grande (máx. 400 caixas)", "error"); return false; }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity;
+    all.forEach((n) => { minX = Math.min(minX, n._x); maxX = Math.max(maxX, n._x); minY = Math.min(minY, n._y); });
+    const r = svgRef.current?.getBoundingClientRect();
+    const vcx = r ? (r.width / 2 - tx) / scale : 320;
+    const vcy = r ? (r.height * 0.26 - ty) / scale : 140;
+    const totalW = (maxX - minX) + W;
+    const offX = vcx - minX - totalW / 2;
+    const offY = vcy - minY;
+    const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
+    const newNodes = all.map((n) => ({ id: n.id, shape: "rect", x: Math.round(offX + n._x), y: Math.round(offY + n._y), w: W, h: H, text: n.label, bg: pal.bg, color: pal.border, textColor: pal.text, fontSize: 14 }));
+    const newEdges: any[] = [];
+    all.forEach((n) => n.children.forEach((c: any) => newEdges.push({ id: uid(), from: n.id, to: c.id, color: "#94a3b8", label: "", arrowEnd: false, style: "solid", bend: "ortho", bendAxis: "v" })));
+    commit([...nodesRef.current, ...newNodes], [...edgesRef.current, ...newEdges]);
+    setSelected(null);
+    toast("Organograma criado — " + newNodes.length + " caixa(s)", "success");
+    return true;
+  };
+  const ORG_EXAMPLE = "CEO\n  Diretor de Tecnologia\n    Dev Backend\n    Dev Frontend\n  Diretor Financeiro\n    Contador\n  Diretor de Marketing";
   // Cria uma nova forma já conectada por uma seta, na direção escolhida
   const quickAddConnected = (fromId: string, dir: string) => {
     const n = nodeById(fromId);
@@ -6688,6 +6776,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         <button onClick={fitView} className="h-8 w-8 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-sm" title="Ajustar conteúdo à tela" type="button">⤢</button>
         <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden sm:block" />
         {canEdit && (
+          <button onClick={() => { if (!orgText) setOrgText(ORG_EXAMPLE); setOrgOpen(true); }} className="h-8 px-2 shrink-0 flex items-center justify-center gap-1 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-[11px] font-semibold" title="Criar um organograma a partir de texto" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg><span className="hidden lg:inline">Organograma</span></button>
+        )}
+        {canEdit && (
           <button onClick={() => { if (dgFileRef.current) dgFileRef.current.click(); }} className="h-8 px-2 shrink-0 flex items-center justify-center gap-1 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-[11px] font-semibold" title="Importar imagens ou PDF para o diagrama" type="button">📥<span className="hidden lg:inline">Importar</span></button>
         )}
         <div className="relative shrink-0">
@@ -6918,6 +7009,32 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           onClose={() => setShowIconPicker(false)}
           onPick={(icon: string) => { onUpdate({ icon }); setShowIconPicker(false); }}
         />
+      )}
+      {orgOpen && (
+        <CustomDialog open={true} onClose={() => setOrgOpen(false)} title="Criar organograma" maxWidth="max-w-lg">
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Digite a estrutura. Use <b className="text-foreground">indentação</b> (Tab ou espaços) para a hierarquia — cada nível vira uma camada do organograma.<br />
+              Também aceita setas no estilo Mermaid: <code className="bg-muted rounded px-1">Chefe --&gt; Subordinado</code>.
+            </p>
+            <textarea
+              value={orgText}
+              onChange={(e) => setOrgText(e.target.value)}
+              rows={10}
+              spellCheck={false}
+              placeholder={ORG_EXAMPLE}
+              className="w-full rounded-lg border border-border bg-background p-3 text-sm font-mono outline-none focus:border-primary resize-y"
+              style={{ minHeight: 190 }}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <button onClick={() => setOrgText(ORG_EXAMPLE)} className="text-xs text-muted-foreground hover:text-foreground transition-colors" type="button">↺ Usar exemplo</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setOrgOpen(false)} className="px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors" type="button">Cancelar</button>
+                <button onClick={() => { if (createOrgChart(orgText)) setOrgOpen(false); }} className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity" type="button">Criar organograma</button>
+              </div>
+            </div>
+          </div>
+        </CustomDialog>
       )}
     </div>
   );
