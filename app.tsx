@@ -5732,6 +5732,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const hasArrows = lines.some((l) => /-{1,2}>|→/.test(l));
     const reg = new Map<string, any>();
     const roots: any[] = [];
+    const outlineNodes: any[] = [];
     const ensure = (key: string, label: string) => {
       if (!reg.has(key)) reg.set(key, { id: uid(), label: label || key, children: [], parent: null });
       const n = reg.get(key); if (label && (n.label === key || !n.label)) n.label = label; return n;
@@ -5760,31 +5761,40 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const label = raw.trim().replace(/^[-*•]\s+/, "");
         if (!label) continue;
         const node = { id: uid(), label, children: [], parent: null as any };
+        outlineNodes.push(node);
         while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
         if (stack.length) { node.parent = stack[stack.length - 1].node; stack[stack.length - 1].node.children.push(node); }
         else roots.push(node);
         stack.push({ indent, node });
       }
     }
-    return roots.length ? roots : null;
+    const all = hasArrows ? Array.from(reg.values()) : outlineNodes;
+    if (!all.length) return null;
+    return { roots, all };
   };
   const createOrgChart = (text: string) => {
-    const roots = buildOrgTree(text);
-    if (!roots) { toast("Digite a estrutura do organograma", "error"); return false; }
+    const built = buildOrgTree(text);
+    if (!built || !built.all.length) { toast("Digite a estrutura do organograma", "error"); return false; }
+    const roots = built.roots, allNodes = built.all;
+    if (allNodes.length > 400) { toast("Organograma muito grande (máx. 400 caixas)", "error"); return false; }
     const W = 158, H = 58, HGAP = 26, VGAP = 64;
     let cursor = 0;
+    const visited = new Set<any>();
+    // Layout em árvore com conjunto de visitados: tolera ciclos/contradições
+    // (entrada por setas) sem recursão infinita e sem perder nós.
     const place = (node: any, depth: number) => {
+      if (visited.has(node)) return;
+      visited.add(node);
       node._y = depth * (H + VGAP);
-      if (!node.children.length) { node._x = cursor; cursor += W + HGAP; }
-      else { node.children.forEach((c: any) => place(c, depth + 1)); node._x = (node.children[0]._x + node.children[node.children.length - 1]._x) / 2; }
+      const kids = (node.children || []).filter((c: any) => !visited.has(c));
+      if (!kids.length) { node._x = cursor; cursor += W + HGAP; }
+      else { kids.forEach((c: any) => place(c, depth + 1)); node._x = (kids[0]._x + kids[kids.length - 1]._x) / 2; }
     };
     roots.forEach((r: any) => place(r, 0));
-    const all: any[] = [];
-    const collect = (n: any) => { all.push(n); n.children.forEach(collect); };
-    roots.forEach(collect);
-    if (all.length > 400) { toast("Organograma muito grande (máx. 400 caixas)", "error"); return false; }
+    // Promove qualquer nó inalcançável (preso em ciclo) como nova raiz — nada some.
+    allNodes.forEach((n: any) => { if (!visited.has(n)) place(n, 0); });
     let minX = Infinity, maxX = -Infinity, minY = Infinity;
-    all.forEach((n) => { minX = Math.min(minX, n._x); maxX = Math.max(maxX, n._x); minY = Math.min(minY, n._y); });
+    allNodes.forEach((n: any) => { minX = Math.min(minX, n._x); maxX = Math.max(maxX, n._x); minY = Math.min(minY, n._y); });
     const r = svgRef.current?.getBoundingClientRect();
     const vcx = r ? (r.width / 2 - tx) / scale : 320;
     const vcy = r ? (r.height * 0.26 - ty) / scale : 140;
@@ -5792,9 +5802,13 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const offX = vcx - minX - totalW / 2;
     const offY = vcy - minY;
     const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
-    const newNodes = all.map((n) => ({ id: n.id, shape: "rect", x: Math.round(offX + n._x), y: Math.round(offY + n._y), w: W, h: H, text: n.label, bg: pal.bg, color: pal.border, textColor: pal.text, fontSize: 14 }));
+    const newNodes = allNodes.map((n: any) => ({ id: n.id, shape: "rect", x: Math.round(offX + n._x), y: Math.round(offY + n._y), w: W, h: H, text: n.label, bg: pal.bg, color: pal.border, textColor: pal.text, fontSize: 14 }));
+    const seenEdge = new Set<string>();
     const newEdges: any[] = [];
-    all.forEach((n) => n.children.forEach((c: any) => newEdges.push({ id: uid(), from: n.id, to: c.id, color: "#94a3b8", label: "", arrowEnd: false, style: "solid", bend: "ortho", bendAxis: "v" })));
+    allNodes.forEach((n: any) => (n.children || []).forEach((c: any) => {
+      const k = n.id + ">" + c.id; if (seenEdge.has(k)) return; seenEdge.add(k);
+      newEdges.push({ id: uid(), from: n.id, to: c.id, color: "#94a3b8", label: "", arrowEnd: false, style: "solid", bend: "ortho", bendAxis: "v" });
+    }));
     commit([...nodesRef.current, ...newNodes], [...edgesRef.current, ...newEdges]);
     setSelected(null);
     toast("Organograma criado — " + newNodes.length + " caixa(s)", "success");

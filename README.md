@@ -128,10 +128,12 @@ O `content` (JSONB) define o **tipo da página**, detectado pelo primeiro item:
   multi-seleção por laço, **copiar/colar/recortar** e **agrupar/desagrupar**
   (Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+G e botões na barra do topo).
 - **DiagramEditor** — diagramas conectados tipo Miro: formas, texto dentro
-  das formas, setas curvas (ponta em um ou nos dois lados), múltiplas setas,
+  das formas, setas curvas **ou com dobras retas (ortogonais, estilo
+  organograma)** (ponta em um ou nos dois lados), múltiplas setas,
   multi-seleção por laço, **agrupar/desagrupar**, **copiar/colar/recortar**
   (Ctrl+C / Ctrl+V / Ctrl+X e botões na barra do topo), desfazer/refazer,
-  paleta de cores.
+  paleta de cores. Botão **"Organograma"** gera caixas conectadas a partir de
+  texto (indentação por Tab/espaços ou setas estilo Mermaid `A --> B`).
 - **IconPicker** — ~1750 ícones flat **SVG embutidos** (monocromáticos, base
   Lucide + curados, sem CDN; busca em português) + emojis.
 
