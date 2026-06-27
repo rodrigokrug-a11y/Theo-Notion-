@@ -9695,6 +9695,30 @@ function getBeforeAfterHtml(el: HTMLElement) {
   }
 }
 
+// Detecta um parágrafo cujo conteúdo é APENAS um (ou mais) chip(s) de link de
+// página — sem texto solto além de espaços/quebras. Esses parágrafos recebem um
+// espaçamento vertical compacto para empilharem juntinhos como no Notion.
+function isPageLinkOnlyHtml(html: any) {
+  if (typeof html !== "string" || html.indexOf("data-page-id") === -1) return false;
+  try {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    let links = 0, other = 0;
+    d.childNodes.forEach((n: any) => {
+      if (n.nodeType === 3) {
+        if ((n.textContent || "").replace(/ /g, "").trim() !== "") other++;
+      } else if (n.nodeType === 1) {
+        const el = n as HTMLElement;
+        if (el.tagName === "BR") return;
+        const isChip = (el.matches && (el.matches("[data-page-id]") || el.matches(".dc-pagelink"))) ||
+          (el.querySelector && !!el.querySelector("[data-page-id]"));
+        if (isChip) links++; else other++;
+      }
+    });
+    return links >= 1 && other === 0;
+  } catch (e) { return false; }
+}
+
 function handleMarkdownPaste(e: any, onPasteBlocks: any) {
   const text = e.clipboardData?.getData("text/plain") || "";
   if (!text || !looksLikeMarkdown(text)) return false;
@@ -9772,11 +9796,21 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
     if (link && link.dataset.pageId) onSelectPage(link.dataset.pageId);
   };
 
+  // key="ce" mantém o contentEditable estável entre parágrafo/títulos/citação.
+  // Os wrappers de lista usam keys próprias ("li-bullet"/"li-numbered"): ao
+  // converter parágrafo↔lista a raiz retornada muda de "ce" para "li-*", o que
+  // FORÇA o React a remontar a subárvore. Sem isso o React reaproveitava a mesma
+  // <div> raiz e o nó de texto "/" digitado (que o React não rastreia, pois o
+  // contentEditable é preenchido via innerHTML) ficava preso antes do marcador —
+  // era o "/" que sobrava no primeiro item da lista.
+  // Linhas que são só link de página empilham compactas (igual ao Notion).
+  const linkOnly = block.type === "paragraph" && isPageLinkOnlyHtml(block.html);
+  const blockCls = linkOnly ? "text-[15px] leading-6 text-foreground py-px" : baseCls[block.type];
   const inner = (
-    <div ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} className={"outline-none break-words " + baseCls[block.type] + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
+    <div key="ce" ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} className={"outline-none break-words " + blockCls + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
   );
 
-  if (block.type === "bullet") return (<div className="flex items-start gap-2 group"><span className="text-foreground pt-1.5 select-none leading-none">•</span><div className="flex-1 min-w-0">{inner}</div></div>);
+  if (block.type === "bullet") return (<div key="li-bullet" className="flex items-start gap-2 group"><span className="text-foreground pt-1.5 select-none leading-none">•</span><div className="flex-1 min-w-0">{inner}</div></div>);
   if (block.type === "numbered") {
     let n = 1;
     if (Array.isArray(allBlocks) && typeof listIndex === "number") {
@@ -9785,7 +9819,7 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
         else if ((allBlocks[i]?.indent || 0) < (block.indent || 0)) break;
       }
     }
-    return (<div className="flex items-start gap-2 group"><span className="text-foreground pt-1 select-none text-[15px] tabular-nums">{n}.</span><div className="flex-1 min-w-0">{inner}</div></div>);
+    return (<div key="li-numbered" className="flex items-start gap-2 group"><span className="text-foreground pt-1 select-none text-[15px] tabular-nums">{n}.</span><div className="flex-1 min-w-0">{inner}</div></div>);
   }
   return inner;
 }
