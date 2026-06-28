@@ -5040,6 +5040,12 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
     .sort((a: any, b: any) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
     .slice(0, 4);
   const trashCount = (Array.isArray(pages)?pages:[]).filter((p: any) => p.deleted_at).length;
+  // Listas "tipo app": todos os diagramas / cadernos do workspace (mais recentes primeiro)
+  const byRecent = (a: any, b: any) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+  const allDiagrams = (Array.isArray(pages)?pages:[]).filter((p: any) => !p.deleted_at && isDiagramPage(p)).sort(byRecent);
+  const allCanvases = (Array.isArray(pages)?pages:[]).filter((p: any) => !p.deleted_at && isCanvasPage(p)).sort(byRecent);
+  const [showDiag, setShowDiag] = useState(true);
+  const [showCanv, setShowCanv] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   // Mantém os ancestrais da página ativa sempre expandidos na árvore
@@ -5156,6 +5162,52 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
                 <span className="flex-1 truncate">{p.title || "Sem título"}</span>
               </button>
             ))}
+          </div>
+        )}
+
+        {(allDiagrams.length > 0 || canEdit) && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between pr-1">
+              <button onClick={() => setShowDiag((v) => !v)} className={secLabel + " pb-0 flex items-center gap-1 hover:text-foreground transition-colors"} type="button">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className={"transition-transform " + (showDiag ? "rotate-90" : "")}><path d="M9 6l6 6-6 6" /></svg>
+                Diagramas {allDiagrams.length > 0 && <span className="text-muted-foreground/60 font-normal">{allDiagrams.length}</span>}
+              </button>
+              {canEdit && <button onClick={() => { setShowDiag(true); onCreate(null, "diagram"); }} className="h-[18px] w-[18px] flex items-center justify-center rounded-[5px] text-muted-foreground/70 hover:bg-accent hover:text-foreground transition-colors" title="Novo diagrama" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></button>}
+            </div>
+            {showDiag && (
+              <div className="mt-1">
+                {(Array.isArray(allDiagrams)?allDiagrams:[]).map((p: any) => (
+                  <button key={p.id} onClick={() => onSelect(p.id)} className={navItem(activeId === p.id && view === "page")} type="button">
+                    <PageChip page={p} />
+                    <span className="flex-1 truncate">{p.title || "Sem título"}</span>
+                  </button>
+                ))}
+                {allDiagrams.length === 0 && <div className="px-2 py-1.5 text-[11px] text-muted-foreground/70 italic">Nenhum diagrama ainda.</div>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(allCanvases.length > 0 || canEdit) && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between pr-1">
+              <button onClick={() => setShowCanv((v) => !v)} className={secLabel + " pb-0 flex items-center gap-1 hover:text-foreground transition-colors"} type="button">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className={"transition-transform " + (showCanv ? "rotate-90" : "")}><path d="M9 6l6 6-6 6" /></svg>
+                Cadernos {allCanvases.length > 0 && <span className="text-muted-foreground/60 font-normal">{allCanvases.length}</span>}
+              </button>
+              {canEdit && <button onClick={() => { setShowCanv(true); onCreate(null, "canvas"); }} className="h-[18px] w-[18px] flex items-center justify-center rounded-[5px] text-muted-foreground/70 hover:bg-accent hover:text-foreground transition-colors" title="Novo caderno" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></button>}
+            </div>
+            {showCanv && (
+              <div className="mt-1">
+                {(Array.isArray(allCanvases)?allCanvases:[]).map((p: any) => (
+                  <button key={p.id} onClick={() => onSelect(p.id)} className={navItem(activeId === p.id && view === "page")} type="button">
+                    <PageChip page={p} />
+                    <span className="flex-1 truncate">{p.title || "Sem título"}</span>
+                  </button>
+                ))}
+                {allCanvases.length === 0 && <div className="px-2 py-1.5 text-[11px] text-muted-foreground/70 italic">Nenhum caderno ainda.</div>}
+              </div>
+            )}
           </div>
         )}
 
