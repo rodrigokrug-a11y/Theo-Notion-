@@ -10764,9 +10764,9 @@ function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBac
   };
 
   return (
-    <div className="my-1">
+    <div className="mb-1">
       <div className="flex items-start gap-1 group">
-        <button onClick={() => onUpdate({ open: !block.open })} className="h-7 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 text-xs" type="button">
+        <button onClick={() => onUpdate({ open: !block.open })} className="h-8 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 text-xs" type="button">
           {block.open ? "▼" : "▶"}
         </button>
         <div ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder="Alternar" className="flex-1 min-w-0 outline-none text-[15px] leading-7 text-foreground py-1 break-words empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40" />
