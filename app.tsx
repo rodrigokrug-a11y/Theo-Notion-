@@ -9303,8 +9303,10 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const [selMode, setSelMode] = useState(false); // modo de seleção (ferramenta de laço)
   const [marq, setMarq] = useState<any>(null); // retângulo do laço (coords no container)
   const [activeId, setActiveId] = useState<string | null>(null); // bloco com foco (mostra a alça no toque)
+  const [blockSelecting, setBlockSelecting] = useState(false); // arrastando seleção entre blocos
   const dragRef = useRef<any>(null);
   const selDragRef = useRef<any>(null);
+  const csRef = useRef<any>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
@@ -9522,7 +9524,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     window.addEventListener("pointercancel", up);
   };
   // Limpa listeners de arraste e poda a seleção se a lista mudar / desmontar.
-  useEffect(() => () => { const st = dragRef.current; if (st && st.cleanup) st.cleanup(); }, []);
+  useEffect(() => () => { [dragRef.current, csRef.current].forEach((st) => { if (st && st.cleanup) st.cleanup(); }); }, []);
   useEffect(() => {
     setSelIds((prev) => { const ok = prev.filter((id) => (Array.isArray(blocks) ? blocks : []).some((b: any) => b.id === id)); return ok.length === prev.length ? prev : ok; });
   }, [blocks]);
@@ -9571,6 +9573,65 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     }
   };
   const exitSel = () => { setSelMode(false); setSelIds([]); setMarq(null); };
+
+  // Seleção entre blocos (estilo Notion): arrastar com o mouse a partir do texto
+  // de um bloco para outro seleciona os blocos inteiros (o navegador não estende
+  // a seleção nativa entre contenteditables separados). No toque, use o laço.
+  const blockIdAt = (x: number, y: number) => {
+    const root = rootRef.current; if (!root) return null;
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const b = el && el.closest ? el.closest("[data-blk-id]") : null;
+    return b && root.contains(b) ? b.getAttribute("data-blk-id") : null;
+  };
+  const onRootPointerDown = (e: any) => {
+    if (!canEdit || nested || selMode) return;
+    if (e.pointerType === "touch" || (e.button !== undefined && e.button !== 0)) return;
+    const t = e.target as HTMLElement;
+    if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
+    const startId = blockIdAt(e.clientX, e.clientY);
+    if (!startId) return;
+    setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
+    const st: any = { startId, active: false };
+    const move = (ev: any) => {
+      const curId = blockIdAt(ev.clientX, ev.clientY);
+      if (!st.active) { if (curId && curId !== startId) st.active = true; else return; }
+      if (!curId) return;
+      const ids = (Array.isArray(list) ? list : []).map((x: any) => x.id);
+      const ia = ids.indexOf(startId), ib = ids.indexOf(curId);
+      if (ia < 0 || ib < 0) return;
+      const lo = Math.min(ia, ib), hi = Math.max(ia, ib);
+      setSelIds(ids.slice(lo, hi + 1));
+      setBlockSelecting(true);
+      try { const s = window.getSelection(); s && s.removeAllRanges(); } catch (err) {}
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setBlockSelecting(false);
+      csRef.current = null;
+    };
+    csRef.current = { cleanup: up };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+  // Copiar os blocos selecionados (texto + html) para a área de transferência.
+  const copySelected = async () => {
+    const cur = Array.isArray(list) ? list : [];
+    const chosen = cur.filter((b: any) => selIds.indexOf(b.id) !== -1);
+    if (!chosen.length) return;
+    const html = chosen.map((b: any) => "<div>" + (b.html || "") + "</div>").join("");
+    const text = chosen.map((b: any) => htmlToText(b.html || "")).join("\n");
+    try {
+      const CI = (window as any).ClipboardItem;
+      if (navigator.clipboard && CI) {
+        await navigator.clipboard.write([new CI({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]);
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      }
+    } catch (e) { try { await navigator.clipboard.writeText(text); } catch (e2) {} }
+  };
 
   const insertMention = (page: any) => {
     try {
@@ -9647,7 +9708,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div ref={rootRef} className="space-y-1 relative">
+    <div ref={rootRef} onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (blockSelecting ? "select-none" : "")}>
       {(Array.isArray(list)?list:[]).map((block, i) => (
         <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
@@ -9715,6 +9776,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           <div className="w-px h-5 bg-border" />
           <button onClick={() => moveSel(-1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para cima" type="button">↑</button>
           <button onClick={() => moveSel(1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para baixo" type="button">↓</button>
+          <button onClick={copySelected} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Copiar seleção" type="button">⧉ Copiar</button>
           <button onClick={removeSelected} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-destructive hover:bg-destructive/10" : "text-muted-foreground/40")} type="button">🗑️ Excluir</button>
           <div className="w-px h-5 bg-border" />
           <button onClick={exitSel} className="text-xs font-semibold text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors" type="button">Concluir</button>
