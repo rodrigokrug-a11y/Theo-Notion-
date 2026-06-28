@@ -9257,12 +9257,17 @@ function FormatToolbar() {
   );
 }
 
-function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink }: any) {
+function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink, nested }: any) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [slash, setSlash] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
   const [mention, setMention] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
   const [pageLinkFor, setPageLinkFor] = useState<{ blockId: string; query: string } | null>(null);
   const [newPageFor, setNewPageFor] = useState<{ blockId: string; query: string } | null>(null);
+  const [selIds, setSelIds] = useState<string[]>([]); // blocos selecionados (multi-seleção)
+  const [menuForId, setMenuForId] = useState<string | null>(null); // qual bloco mostra o menu da alça
+  const [dropIdx, setDropIdx] = useState<number | null>(null); // posição do indicador ao arrastar
+  const dragRef = useRef<any>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
 
@@ -9411,6 +9416,79 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     updateBlock(id, { indent: newIndent });
   };
 
+  // Move um conjunto de blocos para antes da posição `targetIdx` (índice na lista atual).
+  const moveBlocks = (ids: string[], targetIdx: number) => {
+    const cur = Array.isArray(list) ? list : [];
+    const idset = new Set(ids);
+    const ref = cur[targetIdx]; // bloco diante do qual inserir (undefined = fim)
+    if (ref && idset.has(ref.id)) return; // soltou sobre a própria seleção → no-op
+    const moving = cur.filter((b) => idset.has(b.id));
+    if (!moving.length) return;
+    const rest = cur.filter((b) => !idset.has(b.id));
+    let at = ref ? rest.findIndex((b) => b.id === ref.id) : rest.length;
+    if (at < 0) at = rest.length;
+    onChange([...rest.slice(0, at), ...moving, ...rest.slice(at)]);
+  };
+  const removeSelected = () => {
+    if (!selIds.length) return;
+    const idset = new Set(selIds);
+    const next = (Array.isArray(list) ? list : []).filter((b) => !idset.has(b.id));
+    onChange(next.length ? next : [newBlock()]);
+    setSelIds([]); setMenuForId(null);
+  };
+  const clearSel = () => setSelIds([]);
+
+  // Arraste pela alça (⠿): funciona com mouse e toque (pointer events).
+  // Clique curto sem mover = abre o menu (ou alterna seleção no modo seleção).
+  const startHandleDrag = (e: any, block: any, i: number) => {
+    if (!canEdit) return;
+    e.preventDefault(); e.stopPropagation();
+    const ids = (selIds.indexOf(block.id) !== -1 && selIds.length) ? selIds.slice() : [block.id];
+    const st: any = dragRef.current = { ids, startX: e.clientX, startY: e.clientY, moved: false };
+    const computeDrop = (clientY: number) => {
+      const root = rootRef.current; if (!root) return null;
+      // :scope > evita contar linhas de editores aninhados (ex.: dentro de um toggle)
+      const rows = Array.from(root.querySelectorAll(":scope > [data-blk-row]")) as HTMLElement[];
+      for (let k = 0; k < rows.length; k++) {
+        const r = rows[k].getBoundingClientRect();
+        if (clientY < r.top + r.height / 2) return k;
+      }
+      return rows.length;
+    };
+    const mv = (ev: any) => {
+      if (!st.moved && (Math.abs(ev.clientY - st.startY) > 5 || Math.abs(ev.clientX - st.startX) > 5)) st.moved = true;
+      if (st.moved) setDropIdx(computeDrop(ev.clientY));
+    };
+    const cleanup = () => {
+      window.removeEventListener("pointermove", mv);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setDropIdx(null);
+      dragRef.current = null;
+    };
+    const up = (ev: any) => {
+      const moved = st.moved, cancelled = ev.type === "pointercancel";
+      const d = moved && !cancelled ? computeDrop(ev.clientY) : null;
+      cleanup();
+      if (cancelled) return;
+      if (moved) { if (d != null) moveBlocks(st.ids, d); }
+      else if (ev.shiftKey || ev.metaKey || ev.ctrlKey || selIds.length) {
+        setSelIds((prev) => (prev.indexOf(block.id) !== -1 ? prev.filter((x) => x !== block.id) : [...prev, block.id]));
+      } else {
+        setMenuForId((m) => (m === block.id ? null : block.id));
+      }
+    };
+    st.cleanup = cleanup;
+    window.addEventListener("pointermove", mv);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+  // Limpa listeners de arraste e poda a seleção se a lista mudar / desmontar.
+  useEffect(() => () => { const st = dragRef.current; if (st && st.cleanup) st.cleanup(); }, []);
+  useEffect(() => {
+    setSelIds((prev) => { const ok = prev.filter((id) => (Array.isArray(blocks) ? blocks : []).some((b: any) => b.id === id)); return ok.length === prev.length ? prev : ok; });
+  }, [blocks]);
+
   const insertMention = (page: any) => {
     try {
       const sel = window.getSelection();
@@ -9486,25 +9564,36 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div className="space-y-1 relative">
+    <div ref={rootRef} className="space-y-1 relative">
       {(Array.isArray(list)?list:[]).map((block, i) => (
-        <div key={block.id} id={"blk-" + block.id} className="group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5">
+        <div key={block.id} data-blk-row id={"blk-" + block.id} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
+          {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
           {canEdit && (
-            <div contentEditable={false} className="absolute left-2 top-1.5 opacity-0 group-hover/block:opacity-100 transition-opacity flex items-center justify-center select-none z-50">
-              <CustomMenu
-                triggerCls="h-6 w-6 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground transition-colors cursor-pointer"
-                triggerContent={
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="9" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/>
-                    <circle cx="15" cy="6" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
-                  </svg>
-                }
-                items={[
-                  { label: "Excluir bloco", icon: <span className="text-sm">🗑️</span>, onClick: () => removeBlock(block.id) },
-                  { label: "Mover para cima", icon: <span className="text-sm">↑</span>, onClick: () => moveBlockUp(block.id), divider: true },
-                  { label: "Mover para baixo", icon: <span className="text-sm">↓</span>, onClick: () => moveBlockDown(block.id) },
-                ]}
-              />
+            <div contentEditable={false} className="touch-show absolute left-1.5 top-1.5 opacity-0 group-hover/block:opacity-100 transition-opacity flex items-center justify-center select-none z-50">
+              <button
+                onPointerDown={(e) => startHandleDrag(e, block, i)}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                style={{ touchAction: "none" } as any}
+                className={"h-6 w-6 flex items-center justify-center rounded-md transition-colors cursor-grab active:cursor-grabbing " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/20 text-primary" : "hover:bg-accent text-muted-foreground")}
+                title="Arraste para mover · clique para opções"
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="9" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/>
+                  <circle cx="15" cy="6" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+                </svg>
+              </button>
+              {menuForId === block.id && (
+                <>
+                  <div className="fixed inset-0 z-40" onPointerDown={() => setMenuForId(null)} />
+                  <div className="bg-card absolute left-0 top-7 z-50 rounded-xl border border-border shadow-2xl p-1 w-44" style={{ backgroundColor: "hsl(var(--card))" }}>
+                    <button onClick={() => { setSelIds([block.id]); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>☑️</span>Selecionar bloco</button>
+                    <button onClick={() => { moveBlockUp(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>↑</span>Mover para cima</button>
+                    <button onClick={() => { moveBlockDown(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>↓</span>Mover para baixo</button>
+                    <button onClick={() => { removeBlock(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-destructive flex items-center gap-2" type="button"><span>🗑️</span>Excluir bloco</button>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <div className="flex-1 min-w-0 transition-[margin] duration-200" style={{ marginLeft: (block.indent || 0) * 24 }}>
@@ -9530,6 +9619,16 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           </div>
         </div>
       ))}
+      {dropIdx === list.length && <div className="h-0.5 bg-primary rounded-full mx-2" />}
+      {canEdit && !nested && selIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-border shadow-2xl px-3 py-2 flex items-center gap-2 animate-fade-in" style={{ backgroundColor: "hsl(var(--card))" }}>
+          <span className="text-xs font-semibold text-foreground">{selIds.length} bloco{selIds.length > 1 ? "s" : ""}</span>
+          <span className="hidden sm:inline text-[11px] text-muted-foreground">arraste a alça (⠿) para mover · toque na alça para (des)marcar</span>
+          <div className="w-px h-5 bg-border" />
+          <button onClick={removeSelected} className="text-xs font-medium text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors" type="button">🗑️ Excluir</button>
+          <button onClick={clearSel} className="text-xs text-muted-foreground hover:bg-accent px-2 py-1 rounded-lg transition-colors" type="button">Limpar</button>
+        </div>
+      )}
       {slash && (<SlashMenu triggerRect={slash.rect} query={slash.query} onSelect={(t: string) => { if (!slash) return; if (t === "pagelink") { setPageLinkFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else if (t === "newpage") { setNewPageFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else { convertBlock(slash.blockId, t, slash.query); } }} onClose={() => setSlash(null)} />)}
       {mention && (<MentionMenu triggerRect={mention.rect} query={mention.query} pages={pages} onSelect={insertMention} onClose={() => setMention(null)} />)}
       {pageLinkFor && (<PageLinkDialog pages={pages} onClose={() => setPageLinkFor(null)} onPick={insertPageLink} />)}
@@ -10570,7 +10669,7 @@ function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBac
       </div>
       {block.open && (
         <div className="ml-6 pl-3 border-l-2 border-border">
-          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
+          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} nested />
         </div>
       )}
     </div>
