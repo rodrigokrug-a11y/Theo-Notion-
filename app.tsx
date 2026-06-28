@@ -4879,6 +4879,7 @@ function AppContent({ db, user, files }: any) {
                 onSelectPage={(id: string) => setActiveId(id)} onCreateSubpage={() => createPage(activePage.id)}
                 onCreateEmbed={(kind: "diagram" | "canvas") => createEmbeddedPage(activePage.id, kind)}
                 onCreatePageLink={(title: string) => createLinkedPage(activePage.id, title)}
+                onUpdatePage={(id: string, f: any) => queueSave(id, f)}
               />
             )
           ) : (
@@ -5420,7 +5421,7 @@ function PageNode({ page, pages, level, activeId, expanded, setExpanded, onSelec
   );
 }
 
-function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, setShowIconPicker, showCoverPicker, setShowCoverPicker, showColorPicker, setShowColorPicker, onSelectPage, onCreateSubpage, onCreateEmbed, onCreatePageLink }: any) {
+function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, setShowIconPicker, showCoverPicker, setShowCoverPicker, showColorPicker, setShowColorPicker, onSelectPage, onCreateSubpage, onCreateEmbed, onCreatePageLink, onUpdatePage }: any) {
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const [title, setTitle] = useState(page.title || "");
 
@@ -5478,7 +5479,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           className="dc-serif dc-titleink w-full bg-transparent font-bold outline-none resize-none border-0 p-0 mb-4 block placeholder:text-muted-foreground/40"
           style={{ fontSize: "46px", lineHeight: "1.08", minHeight: "58px" }}
         />
-        <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} />
+        <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} onUpdatePage={onUpdatePage} />
 
         {(subs.length > 0 || canEdit) && (
           <div className="mt-8 pt-5 border-t border-border/60">
@@ -5560,7 +5561,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
 // Formas com texto dentro, ligadas por setas que acompanham as formas.
 // Tudo editável: mover, redimensionar, escrever, recolorir, conectar.
 // ========================================================================
-function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showIconPicker, setShowIconPicker }: any) {
+function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showIconPicker, setShowIconPicker, embedHeight }: any) {
   const initBlock = (Array.isArray(page.content) && page.content[0]) || { id: uid(), type: "diagram", nodes: [], edges: [] };
   const blockIdRef = useRef(initBlock.id || uid());
 
@@ -6745,7 +6746,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   };
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: embedHeight || "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
@@ -7219,7 +7220,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 // Baixa latência: traço ao vivo direto no DOM (fora do React), eventos
 // coalescidos (240Hz do Apple Pencil) + pontos previstos pelo navegador.
 // ========================================================================
-function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, headerRight, showIconPicker, setShowIconPicker }: any) {
+function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, headerRight, showIconPicker, setShowIconPicker, embedHeight }: any) {
   const { toast } = BeaUI.useToast();
   const initBlock = (Array.isArray(page.content) && page.content[0]) || { id: uid(), type: "canvas", paper: "lines", bg: "transparent", els: [] };
   const blockIdRef = useRef(initBlock.id || uid());
@@ -8542,7 +8543,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
   const pillStyle: any = {};
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: "calc(100dvh - 48px)", WebkitTouchCallout: "none", WebkitUserSelect: "none" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: embedHeight || "calc(100dvh - 48px)", WebkitTouchCallout: "none", WebkitUserSelect: "none" }}>
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full touch-none"
@@ -9309,7 +9310,7 @@ function FormatToolbar() {
   );
 }
 
-function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink, nested }: any) {
+function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink, onUpdatePage, nested }: any) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [slash, setSlash] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
   const [mention, setMention] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
@@ -9712,7 +9713,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
               onConvert={(type: string, q?: string) => convertBlock(block.id, type, q)}
               onInsertAfter={(type = "paragraph") => insertAfter(block.id, newBlock(type))}
               onPasteBlocks={(before: string, after: string, mdBlocks: any[]) => handlePasteBlocks(block.id, before, after, mdBlocks)}
-              onSelectPage={onSelectPage} pages={pages} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink}
+              onSelectPage={onSelectPage} pages={pages} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} onUpdatePage={onUpdatePage}
               onIndent={() => indentBlock(block.id)}
               onOutdent={() => outdentBlock(block.id)}
               canEdit={canEdit} files={files} listIndex={i} allBlocks={list}
@@ -10047,9 +10048,10 @@ function CanvasPreview({ content }: any) {
   return <svg viewBox={vbx + " " + vby + " " + vbw + " " + vbh} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "100%", display: "block" }} dangerouslySetInnerHTML={{ __html: inner }} />;
 }
 
-function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPage, onCreateEmbed, autoFocus, onAutoFocused }: any) {
+function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPage, onCreateEmbed, onUpdatePage, autoFocus, onAutoFocused }: any) {
   useEffect(() => { if (autoFocus) onAutoFocused(); }, [autoFocus]);
   const [busy, setBusy] = useState(false);
+  const [editInline, setEditInline] = useState(false);
   const refKind = block.refKind === "canvas" ? "canvas" : "diagram";
   const labelKind = refKind === "diagram" ? "diagrama" : "caderno";
   const iconKind = refKind === "diagram" ? "🗺️" : "🎨";
@@ -10086,21 +10088,33 @@ function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPa
     );
   }
 
+  const canInline = canEdit && !!onUpdatePage;
   return (
     <div className="my-2 rounded-xl border-2 border-border overflow-hidden shadow-sm group/embed" style={{ backgroundColor: "hsl(var(--card))" }}>
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/40">
         <span className="text-sm shrink-0">{pageIconNode(page.icon)}</span>
         <span className="text-sm font-medium text-foreground truncate flex-1">{page.title || "Sem título"}</span>
         <span className="shrink-0 text-[10px] uppercase font-bold tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{refKind === "diagram" ? "🗺️ Diagrama" : "🎨 Caderno"}</span>
-        <button onClick={() => onSelectPage(page.id)} className="shrink-0 text-xs font-semibold text-primary hover:underline" type="button">Abrir ›</button>
-        {canEdit && <button onClick={() => onUpdate({ pageId: null })} className="shrink-0 text-xs text-muted-foreground hover:text-foreground" title="Trocar" type="button">Trocar</button>}
-        {canEdit && <button onClick={onBackspace} className="shrink-0 text-xs text-muted-foreground hover:text-foreground" title="Remover bloco" type="button">🗑️</button>}
+        {canInline && (editInline
+          ? <button onClick={() => setEditInline(false)} className="shrink-0 text-xs font-semibold text-primary hover:bg-primary/10 px-2 py-0.5 rounded-md transition-colors" type="button">✓ Concluir</button>
+          : <button onClick={() => setEditInline(true)} className="shrink-0 text-xs font-semibold text-primary hover:bg-primary/10 px-2 py-0.5 rounded-md transition-colors" type="button">✎ Editar aqui</button>)}
+        <button onClick={() => onSelectPage(page.id)} className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground" title="Abrir em tela cheia" type="button">⛶ Abrir</button>
+        {canEdit && !editInline && <button onClick={() => onUpdate({ pageId: null })} className="shrink-0 text-xs text-muted-foreground hover:text-foreground" title="Trocar" type="button">Trocar</button>}
+        {canEdit && !editInline && <button onClick={onBackspace} className="shrink-0 text-xs text-muted-foreground hover:text-foreground" title="Remover bloco" type="button">🗑️</button>}
       </div>
-      <button onClick={() => onSelectPage(page.id)} className="block w-full text-left cursor-pointer" title="Abrir para editar" type="button">
-        <div className="w-full overflow-hidden" style={{ height: 280, backgroundColor: "hsl(var(--muted) / 0.25)" }}>
-          {refKind === "diagram" ? <DiagramPreview content={page.content} /> : <CanvasPreview content={page.content} />}
+      {editInline && canInline ? (
+        <div className="w-full">
+          {refKind === "diagram"
+            ? <DiagramEditor key={page.id} page={page} canEdit={canEdit} onUpdate={(f: any) => onUpdatePage(page.id, f)} embedHeight={520} showIconPicker={false} setShowIconPicker={() => {}} />
+            : <CanvasEditor key={page.id} page={page} canEdit={canEdit} onUpdate={(f: any) => onUpdatePage(page.id, f)} onImportPages={() => {}} embedHeight={520} showIconPicker={false} setShowIconPicker={() => {}} />}
         </div>
-      </button>
+      ) : (
+        <button onClick={() => (canInline ? setEditInline(true) : onSelectPage(page.id))} className="block w-full text-left cursor-pointer" title={canInline ? "Editar aqui" : "Abrir"} type="button">
+          <div className="w-full overflow-hidden" style={{ height: 280, backgroundColor: "hsl(var(--muted) / 0.25)" }}>
+            {refKind === "diagram" ? <DiagramPreview content={page.content} /> : <CanvasPreview content={page.content} />}
+          </div>
+        </button>
+      )}
     </div>
   );
 }
@@ -10726,7 +10740,7 @@ function TableBlock({ block, onUpdate, canEdit, autoFocus, onAutoFocused }: any)
   );
 }
 
-function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBackspace, onSlashOpen, onSlashClose, onMentionOpen, onMentionClose, onSelectPage, onPasteBlocks, canEdit, files, pages, onCreateEmbed, onCreatePageLink }: any) {
+function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBackspace, onSlashOpen, onSlashClose, onMentionOpen, onMentionClose, onSelectPage, onPasteBlocks, canEdit, files, pages, onCreateEmbed, onCreatePageLink, onUpdatePage }: any) {
   const ref = useEditable(block, autoFocus, onAutoFocused);
 
   const onInput = (e: any) => {
@@ -10778,7 +10792,7 @@ function ToggleBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBac
       </div>
       {block.open && (
         <div className="ml-6 pl-3 border-l-2 border-border">
-          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} nested />
+          <BlocksEditor blocks={block.children || [newBlock()]} onChange={(next: any[]) => onUpdate({ children: next })} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} onUpdatePage={onUpdatePage} nested />
         </div>
       )}
     </div>
