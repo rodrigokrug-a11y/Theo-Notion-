@@ -6842,7 +6842,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       })()}
 
       {/* Barra superior: nome do diagrama, navegação e ações */}
-      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1 overflow-x-auto">
+      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex flex-wrap items-center gap-1">
         {headerLeft}
         <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{pageIconNode(page.icon)}</button>
         <input
@@ -6893,7 +6893,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           {exportMenu && (
             <>
               <div className="fixed inset-0 z-40" onPointerDown={() => setExportMenu(false)} />
-              <div className="bg-card canvas-pill fixed right-4 top-14 z-50 rounded-xl border border-border/70 shadow-2xl p-1 w-40" onPointerDown={(e) => e.stopPropagation()}>
+              <div className="bg-card canvas-pill absolute right-0 top-full mt-1 z-50 rounded-xl border border-border/70 shadow-2xl p-1 w-40" onPointerDown={(e) => e.stopPropagation()}>
                 <button onClick={() => exportDiagram("png")} className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground" type="button">🖼️ Imagem PNG</button>
                 <button onClick={() => exportDiagram("pdf")} className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground" type="button">📄 Documento PDF</button>
               </div>
@@ -8787,7 +8787,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
       )}
 
       {/* Barra superior */}
-      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1 overflow-x-auto" style={pillStyle}>
+      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex flex-wrap items-center gap-1" style={pillStyle}>
         {headerLeft}
         <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{pageIconNode(page.icon)}</button>
         <input
@@ -9266,7 +9266,11 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const [selIds, setSelIds] = useState<string[]>([]); // blocos selecionados (multi-seleção)
   const [menuForId, setMenuForId] = useState<string | null>(null); // qual bloco mostra o menu da alça
   const [dropIdx, setDropIdx] = useState<number | null>(null); // posição do indicador ao arrastar
+  const [selMode, setSelMode] = useState(false); // modo de seleção (ferramenta de laço)
+  const [marq, setMarq] = useState<any>(null); // retângulo do laço (coords no container)
+  const [activeId, setActiveId] = useState<string | null>(null); // bloco com foco (mostra a alça no toque)
   const dragRef = useRef<any>(null);
+  const selDragRef = useRef<any>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
@@ -9489,6 +9493,51 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     setSelIds((prev) => { const ok = prev.filter((id) => (Array.isArray(blocks) ? blocks : []).some((b: any) => b.id === id)); return ok.length === prev.length ? prev : ok; });
   }, [blocks]);
 
+  // Move a seleção inteira uma posição para cima/baixo (sem precisar arrastar).
+  const moveSel = (dir: number) => {
+    if (!selIds.length) return;
+    const cur = Array.isArray(list) ? list : [];
+    const idxs = cur.map((b, i) => ({ b, i })).filter((x) => selIds.indexOf(x.b.id) !== -1).map((x) => x.i);
+    if (!idxs.length) return;
+    const minI = Math.min(...idxs), maxI = Math.max(...idxs);
+    if (dir < 0 && minI > 0) moveBlocks(selIds, minI - 1);
+    else if (dir > 0 && maxI < cur.length - 1) moveBlocks(selIds, maxI + 2);
+  };
+  // Ferramenta de seleção (laço): arraste um retângulo para marcar blocos; toque alterna um.
+  const rowRects = () => Array.from(rootRef.current ? rootRef.current.querySelectorAll(":scope > [data-blk-id]") : []) as HTMLElement[];
+  const onSelDown = (e: any) => {
+    const cont = rootRef.current?.getBoundingClientRect(); if (!cont) return;
+    selDragRef.current = { x0: e.clientX - cont.left, y0: e.clientY - cont.top, cx: e.clientX, cy: e.clientY, moved: false, base: (e.shiftKey || e.metaKey || e.ctrlKey) ? selIds.slice() : [] };
+    setMarq({ x: e.clientX - cont.left, y: e.clientY - cont.top, w: 0, h: 0 });
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+  };
+  const onSelMove = (e: any) => {
+    const st = selDragRef.current; if (!st) return;
+    const cont = rootRef.current?.getBoundingClientRect(); if (!cont) return;
+    if (Math.abs(e.clientX - st.cx) > 4 || Math.abs(e.clientY - st.cy) > 4) st.moved = true;
+    const x = e.clientX - cont.left, y = e.clientY - cont.top;
+    const rect = { x: Math.min(x, st.x0), y: Math.min(y, st.y0), w: Math.abs(x - st.x0), h: Math.abs(y - st.y0) };
+    setMarq(rect);
+    if (st.moved) {
+      const sel = new Set<string>(st.base);
+      rowRects().forEach((row) => {
+        const r = row.getBoundingClientRect();
+        const top = r.top - cont.top, bot = r.bottom - cont.top;
+        if (bot >= rect.y && top <= rect.y + rect.h) { const id = row.getAttribute("data-blk-id"); if (id) sel.add(id); }
+      });
+      setSelIds(Array.from(sel));
+    }
+  };
+  const onSelUp = (e: any) => {
+    const st = selDragRef.current; selDragRef.current = null; setMarq(null);
+    if (st && !st.moved) {
+      const hit = rowRects().find((row) => { const r = row.getBoundingClientRect(); return e.clientY >= r.top && e.clientY <= r.bottom; });
+      const id = hit && hit.getAttribute("data-blk-id");
+      if (id) setSelIds((prev) => (prev.indexOf(id) !== -1 ? prev.filter((x) => x !== id) : [...prev, id]));
+    }
+  };
+  const exitSel = () => { setSelMode(false); setSelIds([]); setMarq(null); };
+
   const insertMention = (page: any) => {
     try {
       const sel = window.getSelection();
@@ -9566,10 +9615,10 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   return (
     <div ref={rootRef} className="space-y-1 relative">
       {(Array.isArray(list)?list:[]).map((block, i) => (
-        <div key={block.id} data-blk-row id={"blk-" + block.id} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
+        <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
-          {canEdit && (
-            <div contentEditable={false} className="touch-show absolute left-1.5 top-1.5 opacity-0 group-hover/block:opacity-100 transition-opacity flex items-center justify-center select-none z-50">
+          {canEdit && !selMode && (
+            <div contentEditable={false} className={"absolute left-1.5 top-1.5 transition-opacity flex items-center justify-center select-none z-50 " + (activeId === block.id ? "opacity-100" : "opacity-0 group-hover/block:opacity-100")}>
               <button
                 onPointerDown={(e) => startHandleDrag(e, block, i)}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -9587,7 +9636,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
                 <>
                   <div className="fixed inset-0 z-40" onPointerDown={() => setMenuForId(null)} />
                   <div className="bg-card absolute left-0 top-7 z-50 rounded-xl border border-border shadow-2xl p-1 w-44" style={{ backgroundColor: "hsl(var(--card))" }}>
-                    <button onClick={() => { setSelIds([block.id]); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>☑️</span>Selecionar bloco</button>
+                    {!nested && <button onClick={() => { setSelMode(true); setSelIds([block.id]); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>☑️</span>Selecionar blocos</button>}
                     <button onClick={() => { moveBlockUp(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>↑</span>Mover para cima</button>
                     <button onClick={() => { moveBlockDown(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>↓</span>Mover para baixo</button>
                     <button onClick={() => { removeBlock(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-destructive flex items-center gap-2" type="button"><span>🗑️</span>Excluir bloco</button>
@@ -9620,13 +9669,21 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
         </div>
       ))}
       {dropIdx === list.length && <div className="h-0.5 bg-primary rounded-full mx-2" />}
-      {canEdit && !nested && selIds.length > 0 && (
+      {canEdit && !nested && selMode && (
+        <div className="absolute inset-0 z-30 cursor-crosshair" style={{ touchAction: "none" }} onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}>
+          {marq && <div className="absolute border-2 border-primary bg-primary/10 rounded-sm pointer-events-none" style={{ left: marq.x, top: marq.y, width: marq.w, height: marq.h }} />}
+        </div>
+      )}
+      {canEdit && !nested && (selMode || selIds.length > 0) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-border shadow-2xl px-3 py-2 flex items-center gap-2 animate-fade-in" style={{ backgroundColor: "hsl(var(--card))" }}>
-          <span className="text-xs font-semibold text-foreground">{selIds.length} bloco{selIds.length > 1 ? "s" : ""}</span>
-          <span className="hidden sm:inline text-[11px] text-muted-foreground">arraste a alça (⠿) para mover · toque na alça para (des)marcar</span>
+          {selMode && <span className="hidden sm:inline text-[11px] text-muted-foreground">{selIds.length ? "arraste para marcar mais · toque alterna" : "arraste um retângulo sobre os blocos"}</span>}
+          <span className="text-xs font-semibold text-foreground">{selIds.length} bloco{selIds.length === 1 ? "" : "s"}</span>
           <div className="w-px h-5 bg-border" />
-          <button onClick={removeSelected} className="text-xs font-medium text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors" type="button">🗑️ Excluir</button>
-          <button onClick={clearSel} className="text-xs text-muted-foreground hover:bg-accent px-2 py-1 rounded-lg transition-colors" type="button">Limpar</button>
+          <button onClick={() => moveSel(-1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para cima" type="button">↑</button>
+          <button onClick={() => moveSel(1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para baixo" type="button">↓</button>
+          <button onClick={removeSelected} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-destructive hover:bg-destructive/10" : "text-muted-foreground/40")} type="button">🗑️ Excluir</button>
+          <div className="w-px h-5 bg-border" />
+          <button onClick={exitSel} className="text-xs font-semibold text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors" type="button">Concluir</button>
         </div>
       )}
       {slash && (<SlashMenu triggerRect={slash.rect} query={slash.query} onSelect={(t: string) => { if (!slash) return; if (t === "pagelink") { setPageLinkFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else if (t === "newpage") { setNewPageFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else { convertBlock(slash.blockId, t, slash.query); } }} onClose={() => setSlash(null)} />)}
