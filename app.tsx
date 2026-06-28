@@ -37,6 +37,9 @@ export default function MyApp(props: any) {
         /* Título da página em preto (tema-aware) */
         .dc-titleink { color: #191613; }
         .dark .dc-titleink { color: #f2f0ea; }
+        /* Esconde o realce nativo (que clampa em 1 bloco) durante a seleção de texto entre blocos */
+        .dc-xsel ::selection { background: transparent; }
+        .dc-xsel ::-moz-selection { background: transparent; }
         *::-webkit-scrollbar { width: 11px; height: 11px; }
         *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
         *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
@@ -9303,10 +9306,11 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const [selMode, setSelMode] = useState(false); // modo de seleção (ferramenta de laço)
   const [marq, setMarq] = useState<any>(null); // retângulo do laço (coords no container)
   const [activeId, setActiveId] = useState<string | null>(null); // bloco com foco (mostra a alça no toque)
-  const [blockSelecting, setBlockSelecting] = useState(false); // arrastando seleção entre blocos
+  const [selRects, setSelRects] = useState<any[] | null>(null); // realce próprio da seleção de texto entre blocos
   const dragRef = useRef<any>(null);
   const selDragRef = useRef<any>(null);
   const csRef = useRef<any>(null);
+  const crossSelRef = useRef<any>(null); // Range da seleção entre blocos (para copiar)
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
@@ -9583,32 +9587,54 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     const b = el && el.closest ? el.closest("[data-blk-id]") : null;
     return b && root.contains(b) ? b.getAttribute("data-blk-id") : null;
   };
+  // Posição de caractere (nó+offset) sob as coordenadas — funciona em qualquer bloco.
+  const caretAt = (x: number, y: number): any => {
+    try {
+      const d: any = document;
+      if (d.caretRangeFromPoint) { const r = d.caretRangeFromPoint(x, y); if (r) return { node: r.startContainer, offset: r.startOffset }; }
+      else if (d.caretPositionFromPoint) { const p = d.caretPositionFromPoint(x, y); if (p) return { node: p.offsetNode, offset: p.offset }; }
+    } catch (e) {}
+    return null;
+  };
   const onRootPointerDown = (e: any) => {
     if (!canEdit || nested || selMode) return;
     if (e.pointerType === "touch" || (e.button !== undefined && e.button !== 0)) return;
     const t = e.target as HTMLElement;
     if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
+    const anchor = caretAt(e.clientX, e.clientY);
     const startId = blockIdAt(e.clientX, e.clientY);
-    if (!startId) return;
+    if (!anchor || !startId) return;
     setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
-    const st: any = { startId, active: false };
+    setSelRects(null); crossSelRef.current = null;
+    const st: any = { anchor, startId, crossed: false };
+    // Seleção de TEXTO contínua entre blocos: o navegador não estende a seleção
+    // nativa entre contenteditables separados (clampa em um), então estendemos o
+    // Range com setBaseAndExtent e desenhamos o próprio realce com getClientRects.
+    const span = (x: number, y: number) => {
+      const focus = caretAt(x, y); if (!focus) return;
+      try {
+        const s = window.getSelection(); if (!s || !s.setBaseAndExtent) return;
+        s.setBaseAndExtent(st.anchor.node, st.anchor.offset, focus.node, focus.offset);
+        const root = rootRef.current; if (!s.rangeCount || !root) return;
+        const range = s.getRangeAt(0);
+        const rr = root.getBoundingClientRect();
+        const cr = range.getClientRects(); const rects: any[] = [];
+        for (let i = 0; i < cr.length; i++) { const r = cr[i]; if (r.width < 0.5 && r.height < 0.5) continue; rects.push({ x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height }); }
+        setSelRects(rects);
+        crossSelRef.current = { range: range.cloneRange() };
+      } catch (err) {}
+    };
     const move = (ev: any) => {
       const curId = blockIdAt(ev.clientX, ev.clientY);
-      if (!st.active) { if (curId && curId !== startId) st.active = true; else return; }
-      if (!curId) return;
-      const ids = (Array.isArray(list) ? list : []).map((x: any) => x.id);
-      const ia = ids.indexOf(startId), ib = ids.indexOf(curId);
-      if (ia < 0 || ib < 0) return;
-      const lo = Math.min(ia, ib), hi = Math.max(ia, ib);
-      setSelIds(ids.slice(lo, hi + 1));
-      setBlockSelecting(true);
-      try { const s = window.getSelection(); s && s.removeAllRanges(); } catch (err) {}
+      if (!st.crossed) { if (curId && curId !== st.startId) st.crossed = true; else return; } // dentro do bloco: seleção nativa
+      span(ev.clientX, ev.clientY);
+      if (ev.cancelable) ev.preventDefault();
     };
-    const up = () => {
+    const up = (ev: any) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
-      setBlockSelecting(false);
+      if (st.crossed && ev && typeof ev.clientX === "number") span(ev.clientX, ev.clientY); // seleção final
       csRef.current = null;
     };
     csRef.current = { cleanup: up };
@@ -9616,6 +9642,39 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
   };
+  // Copiar a seleção entre blocos (o navegador só copiaria 1 bloco) e limpar o
+  // realce quando a seleção colapsa (clique em outro lugar).
+  useEffect(() => {
+    if (nested) return;
+    const onCopy = (e: any) => {
+      const cs = crossSelRef.current; if (!cs || !cs.range || !e.clipboardData) return;
+      try {
+        const frag = cs.range.cloneContents();
+        const tmp = document.createElement("div"); tmp.appendChild(frag);
+        e.clipboardData.setData("text/html", tmp.innerHTML);
+        e.clipboardData.setData("text/plain", tmp.textContent || "");
+        e.preventDefault();
+      } catch (err) {}
+    };
+    const onSc = () => {
+      if (csRef.current) return; // arrastando
+      // Mantém o realce/range só enquanto a seleção viva continuar sendo ENTRE
+      // blocos DESTE editor; caso contrário (colapsou, virou um bloco só, ou foi
+      // para outro campo) limpa — evita que o copy global use um range velho.
+      const s = window.getSelection();
+      let keep = false;
+      const root = rootRef.current;
+      if (s && !s.isCollapsed && s.rangeCount && root) {
+        const blk = (n: any) => { const e = n && (n.nodeType === 1 ? n : n.parentElement); return e && e.closest ? e.closest("[data-blk-id]") : null; };
+        const ab = blk(s.anchorNode), fb = blk(s.focusNode);
+        keep = !!(ab && fb && ab !== fb && root.contains(ab) && root.contains(fb));
+      }
+      if (!keep) { setSelRects((p) => (p ? null : p)); crossSelRef.current = null; }
+    };
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("selectionchange", onSc);
+    return () => { document.removeEventListener("copy", onCopy); document.removeEventListener("selectionchange", onSc); };
+  }, [nested]);
   // Copiar os blocos selecionados (texto + html) para a área de transferência.
   const copySelected = async () => {
     const cur = Array.isArray(list) ? list : [];
@@ -9708,7 +9767,10 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div ref={rootRef} onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (blockSelecting ? "select-none" : "")}>
+    <div ref={rootRef} onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (selRects ? "dc-xsel" : "")}>
+      {selRects && selRects.map((r: any, i: number) => (
+        <div key={"selr" + i} className="absolute bg-primary/30 rounded-[2px] pointer-events-none z-0" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
+      ))}
       {(Array.isArray(list)?list:[]).map((block, i) => (
         <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
