@@ -6006,6 +6006,12 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (!ids.length) return;
     commit(nodesRef.current.map((n: any) => (ids.indexOf(n.id) !== -1 ? { ...n, textColor: c } : n)), edgesRef.current);
   };
+  // Posição vertical do texto dentro da forma (topo / meio / base)
+  const setSelectedVAlign = (v: string) => {
+    const ids = selectedNodeIds();
+    if (!ids.length) return;
+    commit(nodesRef.current.map((n: any) => (ids.indexOf(n.id) !== -1 ? { ...n, vAlign: v } : n)), edgesRef.current);
+  };
 
   const zoomBy = (factor: number) => {
     const r = svgRef.current?.getBoundingClientRect();
@@ -6097,8 +6103,12 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (!n.text) return "";
     const fsz = n.fontSize || 15, col = n.textColor || "#0f172a";
     const lines = String(n.text).split("\n");
-    const lh = fsz * 1.25, cx = n.x + n.w / 2;
-    const startY = n.y + n.h / 2 - ((lines.length - 1) * lh) / 2;
+    const lh = fsz * 1.25, cx = n.x + n.w / 2, pad = 8;
+    const startY = n.vAlign === "top"
+      ? n.y + pad + lh / 2
+      : n.vAlign === "bottom"
+        ? n.y + n.h - pad - lh / 2 - (lines.length - 1) * lh
+        : n.y + n.h / 2 - ((lines.length - 1) * lh) / 2;
     let t = '<text x="' + cx + '" y="' + startY + '" font-size="' + fsz + '" fill="' + col + '" font-family="ui-sans-serif,system-ui,sans-serif" font-weight="500" text-anchor="middle" dominant-baseline="middle">';
     lines.forEach((ln, i) => { t += '<tspan x="' + cx + '" dy="' + (i === 0 ? 0 : lh) + '">' + xmlEsc(ln) + '</tspan>'; });
     return t + '</text>';
@@ -6582,7 +6592,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       {renderNodeShape(n)}
       {!(editing && editing.id === n.id) && (n.text || DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1) && (
         <foreignObject x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} style={{ pointerEvents: "none" }}>
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: n.vAlign === "top" ? "flex-start" : n.vAlign === "bottom" ? "flex-end" : "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>
             {n.text}
           </div>
         </foreignObject>
@@ -6655,6 +6665,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         {DOTS.map((c) => (
           <button key={c} onClick={() => setSelectedTextColor(c)} className={"w-[15px] h-[15px] rounded-full border transition-transform hover:scale-110 shrink-0 " + (cur === c ? "ring-2 ring-primary" : "")} style={{ backgroundColor: c, borderColor: "hsl(var(--border))" }} title={c} type="button" />
         ))}
+      </div>
+    );
+  };
+  // Posição vertical do texto dentro da forma (topo / meio / base)
+  const vAlignRow = () => {
+    const ids = selectedNodeIds();
+    const cur = (nodeById(ids[0]) || {}).vAlign || "middle";
+    const vb = (on: boolean) => "h-7 w-7 flex items-center justify-center rounded-lg transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent");
+    return (
+      <div className="flex items-center gap-0.5" title="Posição vertical do texto">
+        <button onClick={() => setSelectedVAlign("top")} className={vb(cur === "top")} title="Texto no topo" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M4 5h16M7 9h10M7 13h6" /></svg></button>
+        <button onClick={() => setSelectedVAlign("middle")} className={vb(cur === "middle")} title="Texto no meio" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M7 8h10M4 12h16M7 16h10" /></svg></button>
+        <button onClick={() => setSelectedVAlign("bottom")} className={vb(cur === "bottom")} title="Texto na base" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M7 11h6M7 15h10M4 19h16" /></svg></button>
       </div>
     );
   };
@@ -6809,7 +6832,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       })()}
 
       {/* Barra superior: nome do diagrama, navegação e ações */}
-      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1">
+      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1 overflow-x-auto">
         {headerLeft}
         <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{pageIconNode(page.icon)}</button>
         <input
@@ -6832,10 +6855,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           const groups = new Set(selNodes.map((n: any) => n.group || null));
           const canGroup = ids.length >= 2 && !(groups.size === 1 && !groups.has(null));
           const canUngroup = selNodes.some((n: any) => !!n.group);
-          const tb = (on: boolean) => "h-8 px-2 shrink-0 hidden md:flex items-center rounded-xl text-xs font-medium transition-colors " + (on ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed");
+          const tb = (on: boolean) => "h-8 px-2 shrink-0 flex items-center rounded-xl text-xs font-medium transition-colors " + (on ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed");
           return (
             <>
-              <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden md:block" />
+              <div className="w-px h-5 bg-border mx-0.5 shrink-0" />
               <button onClick={() => copyDiagram()} disabled={!hasSel} className={tb(hasSel)} title="Copiar seleção (Ctrl+C)" type="button">⧉ Copiar</button>
               <button onClick={() => pasteDiagram()} disabled={!clipReady} className={tb(clipReady)} title="Colar (Ctrl+V)" type="button">📋 Colar</button>
               <button onClick={groupSelected} disabled={!canGroup} className={tb(canGroup)} title="Agrupar — movem juntos (Ctrl+G)" type="button">⊞ Agrupar</button>
@@ -6860,7 +6883,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           {exportMenu && (
             <>
               <div className="fixed inset-0 z-40" onPointerDown={() => setExportMenu(false)} />
-              <div className="bg-card canvas-pill absolute right-0 top-full mt-1 z-50 rounded-xl border border-border/70 shadow-2xl p-1 w-40" onPointerDown={(e) => e.stopPropagation()}>
+              <div className="bg-card canvas-pill fixed right-4 top-14 z-50 rounded-xl border border-border/70 shadow-2xl p-1 w-40" onPointerDown={(e) => e.stopPropagation()}>
                 <button onClick={() => exportDiagram("png")} className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground" type="button">🖼️ Imagem PNG</button>
                 <button onClick={() => exportDiagram("pdf")} className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground" type="button">📄 Documento PDF</button>
               </div>
@@ -6939,6 +6962,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
             <div className="w-px h-5 bg-border" />
             {textColorRow()}
             <div className="w-px h-5 bg-border" />
+            {vAlignRow()}
+            <div className="w-px h-5 bg-border" />
             <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋 Duplicar</button>
             <div className="w-px h-5 bg-border" />
             <button onClick={deleteSelected} className={eBtn} title="Excluir selecionados (Delete)" type="button">🗑️ Excluir</button>
@@ -6956,6 +6981,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               {fontStepper()}
               <div className="w-px h-5 bg-border" />
               {textColorRow()}
+              <div className="w-px h-5 bg-border" />
+              {vAlignRow()}
             </>
           ) : (
             <>
@@ -6964,6 +6991,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               {fontStepper()}
               <div className="w-px h-5 bg-border" />
               {textColorRow()}
+              <div className="w-px h-5 bg-border" />
+              {vAlignRow()}
               <div className="w-px h-5 bg-border" />
               <button onClick={() => { copyDiagram(); pasteDiagram(); }} className={eBtn} title="Duplicar" type="button">📋</button>
               <button onClick={deleteSelected} className={eBtn} title="Excluir (Delete)" type="button">🗑️</button>
@@ -8748,7 +8777,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
       )}
 
       {/* Barra superior */}
-      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1" style={pillStyle}>
+      <div className="canvas-pill absolute top-3 left-3 right-3 z-20 rounded-2xl border border-border/70 shadow-lg px-2 py-1 flex items-center gap-1 overflow-x-auto" style={pillStyle}>
         {headerLeft}
         <button onClick={() => canEdit && setShowIconPicker(true)} className={"text-base leading-none shrink-0 " + (canEdit ? "hover:scale-110 transition-transform" : "")} disabled={!canEdit} title="Alterar ícone" type="button">{pageIconNode(page.icon)}</button>
         <input
@@ -8769,10 +8798,10 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
           const hasSel = ids.length > 0;
           const canGroup = !!(multiSel && multiSel.length > 1);
           const canUngroup = !canGroup && ids.length > 1;
-          const tb = (on: boolean) => "h-8 px-2 shrink-0 hidden lg:flex items-center rounded-xl text-xs font-medium transition-colors " + (on ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed");
+          const tb = (on: boolean) => "h-8 px-2 shrink-0 flex items-center rounded-xl text-xs font-medium transition-colors " + (on ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/30 cursor-not-allowed");
           return (
             <>
-              <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden lg:block" />
+              <div className="w-px h-5 bg-border mx-0.5 shrink-0" />
               <button onClick={() => copySelection()} disabled={!hasSel} className={tb(hasSel)} title="Copiar seleção (Ctrl+C)" type="button">⧉ Copiar</button>
               <button onClick={() => pasteClipboard()} disabled={!clipReady} className={tb(clipReady)} title="Colar (Ctrl+V)" type="button">📋 Colar</button>
               <button onClick={groupSelected} disabled={!canGroup} className={tb(canGroup)} title="Agrupar — movem juntos (Ctrl+G)" type="button">⊞ Agrupar</button>
@@ -9777,7 +9806,7 @@ function DiagramPreview({ content }: any) {
             {shape}
             {showTxt && (
             <foreignObject x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)}>
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>{n.text}</div>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: n.vAlign === "top" ? "flex-start" : n.vAlign === "bottom" ? "flex-end" : "center", justifyContent: "center", padding: "6px 10px", boxSizing: "border-box", color: n.textColor || "#0f172a", fontSize: (n.fontSize || 15) + "px", lineHeight: 1.25, textAlign: "center", whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", fontWeight: 500 }}>{n.text}</div>
             </foreignObject>
             )}
           </g>
