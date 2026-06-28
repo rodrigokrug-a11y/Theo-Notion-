@@ -5541,6 +5541,16 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const orgDirtyRef = useRef(false); // true = usuário editou o código (não sobrescrever com o diagrama)
   const dgFileRef = useRef<HTMLInputElement | null>(null);
   const { toast } = BeaUI.useToast();
+  // Altura do teclado virtual (iPad/celular). As barras de baixo (cores, painel
+  // de código) sobem para não ficarem escondidas atrás do teclado.
+  const [kbInset, setKbInset] = useState(0);
+  useEffect(() => {
+    const vv = (window as any).visualViewport;
+    if (!vv) return;
+    const onR = () => { const i = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); setKbInset(i > 90 ? Math.round(i) : 0); };
+    vv.addEventListener("resize", onR); vv.addEventListener("scroll", onR); onR();
+    return () => { vv.removeEventListener("resize", onR); vv.removeEventListener("scroll", onR); };
+  }, []);
 
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
@@ -6938,7 +6948,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
       {/* Paleta de cores */}
       {canEdit && (
-        <div className="canvas-pill absolute bottom-4 left-1/2 -translate-x-1/2 z-20 rounded-full border border-border/70 shadow-2xl p-1.5 flex items-center gap-1.5">
+        <div className="canvas-pill absolute bottom-4 left-1/2 -translate-x-1/2 z-20 rounded-full border border-border/70 shadow-2xl p-1.5 flex items-center gap-1.5 transition-[bottom] duration-150" style={{ bottom: kbInset ? kbInset + 16 : undefined }}>
           {DIAGRAM_PALETTE.map((pal, i) => (
             <button key={i} onClick={() => applyPalette(i)} className={"w-7 h-7 rounded-full border transition-transform " + (paletteIdx === i ? "ring-2 ring-primary scale-110" : "hover:scale-110")} style={{ backgroundColor: pal.bg === "transparent" ? "#ffffff" : pal.bg, borderColor: pal.border }} title="Aplicar cor" type="button" />
           ))}
@@ -7114,7 +7124,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         />
       )}
       {orgOpen && (
-        <div className="canvas-pill absolute bottom-4 left-3 z-30 rounded-2xl border border-border/70 shadow-2xl p-2.5 w-[272px] max-w-[88vw] flex flex-col gap-2" onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+        <div className="canvas-pill absolute bottom-4 left-3 z-30 rounded-2xl border border-border/70 shadow-2xl p-2.5 w-[272px] max-w-[88vw] flex flex-col gap-2 transition-[bottom] duration-150" style={{ bottom: kbInset ? kbInset + 16 : undefined }} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-primary"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg>
