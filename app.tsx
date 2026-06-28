@@ -9596,6 +9596,29 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     } catch (e) {}
     return null;
   };
+  // Aplica uma seleção entre blocos (anchor→focus), desenha o realce próprio a
+  // partir dos retângulos do range e guarda o range para copiar.
+  const paintCross = (aN: any, aO: number, fN: any, fO: number) => {
+    try {
+      const s = window.getSelection(); if (!s || !s.setBaseAndExtent) return;
+      s.setBaseAndExtent(aN, aO, fN, fO);
+      const root = rootRef.current; if (!s.rangeCount || !root) return;
+      const range = s.getRangeAt(0);
+      const rr = root.getBoundingClientRect();
+      const cr = range.getClientRects(); const rects: any[] = [];
+      for (let i = 0; i < cr.length; i++) { const r = cr[i]; if (r.width < 0.5 && r.height < 0.5) continue; rects.push({ x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height }); }
+      setSelRects(rects);
+      crossSelRef.current = { range: range.cloneRange() };
+    } catch (err) {}
+  };
+  // Seleciona TODOS os blocos do editor como texto contínuo (Ctrl/Cmd+A, 2º toque).
+  const selectAllBlocks = () => {
+    const root = rootRef.current; if (!root) return;
+    const eds = Array.from(root.querySelectorAll('[contenteditable="true"]')) as HTMLElement[];
+    if (!eds.length) return;
+    const f = eds[0], l = eds[eds.length - 1];
+    paintCross(f, 0, l, l.childNodes.length);
+  };
   const onRootPointerDown = (e: any) => {
     if (!canEdit || nested || selMode) return;
     if (e.pointerType === "touch" || (e.button !== undefined && e.button !== 0)) return;
@@ -9612,17 +9635,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     // Range com setBaseAndExtent e desenhamos o próprio realce com getClientRects.
     const span = (x: number, y: number) => {
       const focus = caretAt(x, y); if (!focus) return;
-      try {
-        const s = window.getSelection(); if (!s || !s.setBaseAndExtent) return;
-        s.setBaseAndExtent(st.anchor.node, st.anchor.offset, focus.node, focus.offset);
-        const root = rootRef.current; if (!s.rangeCount || !root) return;
-        const range = s.getRangeAt(0);
-        const rr = root.getBoundingClientRect();
-        const cr = range.getClientRects(); const rects: any[] = [];
-        for (let i = 0; i < cr.length; i++) { const r = cr[i]; if (r.width < 0.5 && r.height < 0.5) continue; rects.push({ x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height }); }
-        setSelRects(rects);
-        crossSelRef.current = { range: range.cloneRange() };
-      } catch (err) {}
+      paintCross(st.anchor.node, st.anchor.offset, focus.node, focus.offset);
     };
     const move = (ev: any) => {
       const curId = blockIdAt(ev.clientX, ev.clientY);
@@ -9671,9 +9684,24 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
       }
       if (!keep) { setSelRects((p) => (p ? null : p)); crossSelRef.current = null; }
     };
+    // Ctrl/Cmd+A: 1º seleciona o bloco (nativo); 2º (bloco já todo selecionado)
+    // seleciona TODOS os blocos como texto contínuo, pronto para copiar.
+    const onKey = (e: any) => {
+      if (!((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A"))) return;
+      const root = rootRef.current; if (!root) return;
+      const ae: any = document.activeElement;
+      if (!ae || !ae.closest || !root.contains(ae)) return;
+      const blkEd = ae.closest('[contenteditable="true"]');
+      if (!blkEd) return;
+      const s = window.getSelection();
+      const full = (blkEd.textContent || "").length;
+      const allOfBlock = !!(s && !s.isCollapsed && (s.toString() || "").length >= full && full > 0);
+      if (allOfBlock || crossSelRef.current) { e.preventDefault(); selectAllBlocks(); }
+    };
     document.addEventListener("copy", onCopy);
     document.addEventListener("selectionchange", onSc);
-    return () => { document.removeEventListener("copy", onCopy); document.removeEventListener("selectionchange", onSc); };
+    document.addEventListener("keydown", onKey, true);
+    return () => { document.removeEventListener("copy", onCopy); document.removeEventListener("selectionchange", onSc); document.removeEventListener("keydown", onKey, true); };
   }, [nested]);
   // Copiar os blocos selecionados (texto + html) para a área de transferência.
   const copySelected = async () => {
