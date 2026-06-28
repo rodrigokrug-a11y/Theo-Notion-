@@ -6316,6 +6316,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const onKey = (e: KeyboardEvent) => {
       const t: any = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      // Embed inline: só responde aos atalhos se o foco está DENTRO deste editor
+      // (evita que dois editores embutidos reajam ao mesmo Ctrl+Z/Delete/etc.).
+      if (embedHeight && (!wrapRef.current || !wrapRef.current.contains(document.activeElement))) return;
       if (!canEdit) return;
       const meta = e.ctrlKey || e.metaKey;
       if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
@@ -6336,6 +6339,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const effTool = canEdit ? tool : "pan";
 
   const onPointerDown = (e: any) => {
+    if (embedHeight) { try { wrapRef.current && wrapRef.current.focus({ preventScroll: true } as any); } catch (err) {} }
     // Botão do meio do mouse: move a tela em todas as direções (PC).
     if (e.pointerType === "mouse" && e.button === 1) {
       e.preventDefault();
@@ -6746,7 +6750,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   };
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: embedHeight || "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
+    <div ref={wrapRef} tabIndex={embedHeight ? -1 : undefined} className="relative w-full overflow-hidden select-none outline-none" style={{ height: embedHeight || "calc(100dvh - 48px)", WebkitUserSelect: "none" }}>
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
@@ -7685,6 +7689,8 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
     const onKey = (e: KeyboardEvent) => {
       const t: any = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      // Embed inline: só responde se o foco está DENTRO deste caderno.
+      if (embedHeight && (!wrapRef.current || !wrapRef.current.contains(document.activeElement))) return;
       if (!canEdit) return;
       const meta = e.ctrlKey || e.metaKey;
       if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
@@ -7972,6 +7978,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
   };
 
   const onPointerDown = (e: any) => {
+    if (embedHeight) { try { wrapRef.current && wrapRef.current.focus({ preventScroll: true } as any); } catch (err) {} }
     if (e.pointerType === "mouse" && e.button !== 0) return;
     lastInputTsRef.current = Date.now();
     if (e.pointerType !== "mouse" && e.cancelable !== false) e.preventDefault();
@@ -8543,7 +8550,7 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
   const pillStyle: any = {};
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden select-none" style={{ height: embedHeight || "calc(100dvh - 48px)", WebkitTouchCallout: "none", WebkitUserSelect: "none" }}>
+    <div ref={wrapRef} tabIndex={embedHeight ? -1 : undefined} className="relative w-full overflow-hidden select-none outline-none" style={{ height: embedHeight || "calc(100dvh - 48px)", WebkitTouchCallout: "none", WebkitUserSelect: "none" }}>
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full touch-none"
@@ -8897,10 +8904,12 @@ function CanvasEditor({ page, canEdit, onUpdate, onImportPages, headerLeft, head
             <div className="text-xs font-semibold text-foreground">🖼️ Inserir nesta página</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">A imagem ou as páginas do PDF entram aqui no caderno, para escrever por cima</div>
           </button>
-          <button onClick={() => { importModeRef.current = "pages"; setImportMenu(false); if (fileInputRef.current) fileInputRef.current.click(); }} className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-accent transition-colors" type="button">
-            <div className="text-xs font-semibold text-foreground">📑 Criar páginas novas</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Cada página do PDF vira uma subpágina deste caderno</div>
-          </button>
+          {onImportPages && (
+            <button onClick={() => { importModeRef.current = "pages"; setImportMenu(false); if (fileInputRef.current) fileInputRef.current.click(); }} className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-accent transition-colors" type="button">
+              <div className="text-xs font-semibold text-foreground">📑 Criar páginas novas</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Cada página do PDF vira uma subpágina deste caderno</div>
+            </button>
+          )}
         </div>
       )}
 
@@ -10106,7 +10115,7 @@ function PageRefBlock({ block, onUpdate, onBackspace, canEdit, pages, onSelectPa
         <div className="w-full">
           {refKind === "diagram"
             ? <DiagramEditor key={page.id} page={page} canEdit={canEdit} onUpdate={(f: any) => onUpdatePage(page.id, f)} embedHeight={520} showIconPicker={false} setShowIconPicker={() => {}} />
-            : <CanvasEditor key={page.id} page={page} canEdit={canEdit} onUpdate={(f: any) => onUpdatePage(page.id, f)} onImportPages={() => {}} embedHeight={520} showIconPicker={false} setShowIconPicker={() => {}} />}
+            : <CanvasEditor key={page.id} page={page} canEdit={canEdit} onUpdate={(f: any) => onUpdatePage(page.id, f)} embedHeight={520} showIconPicker={false} setShowIconPicker={() => {}} />}
         </div>
       ) : (
         <button onClick={() => (canInline ? setEditInline(true) : onSelectPage(page.id))} className="block w-full text-left cursor-pointer" title={canInline ? "Editar aqui" : "Abrir"} type="button">
