@@ -9306,11 +9306,13 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const [selMode, setSelMode] = useState(false); // modo de seleção (ferramenta de laço)
   const [marq, setMarq] = useState<any>(null); // retângulo do laço (coords no container)
   const [activeId, setActiveId] = useState<string | null>(null); // bloco com foco (mostra a alça no toque)
-  const [selRects, setSelRects] = useState<any[] | null>(null); // realce próprio da seleção de texto entre blocos
+  const [xsel, setXsel] = useState(false); // ativo = seleção de texto entre blocos (esconde realce nativo)
   const dragRef = useRef<any>(null);
   const selDragRef = useRef<any>(null);
   const csRef = useRef<any>(null);
   const crossSelRef = useRef<any>(null); // Range da seleção entre blocos (para copiar)
+  const overlayRef = useRef<HTMLDivElement | null>(null); // camada do realce próprio (imperativa)
+  const xselRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
@@ -9596,20 +9598,33 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     } catch (e) {}
     return null;
   };
-  // Aplica uma seleção entre blocos (anchor→focus), desenha o realce próprio a
-  // partir dos retângulos do range e guarda o range para copiar.
+  // Aplica uma seleção entre blocos (anchor→focus) e desenha o realce próprio
+  // DIRETAMENTE no DOM (sem re-render do React por movimento), a partir dos
+  // retângulos do range; guarda o range para copiar. (O realce nativo é clampado
+  // a um bloco pelo navegador, por isso desenhamos o nosso.)
   const paintCross = (aN: any, aO: number, fN: any, fO: number) => {
     try {
       const s = window.getSelection(); if (!s || !s.setBaseAndExtent) return;
       s.setBaseAndExtent(aN, aO, fN, fO);
-      const root = rootRef.current; if (!s.rangeCount || !root) return;
+      const root = rootRef.current, ov = overlayRef.current; if (!s.rangeCount || !root || !ov) return;
       const range = s.getRangeAt(0);
       const rr = root.getBoundingClientRect();
-      const cr = range.getClientRects(); const rects: any[] = [];
-      for (let i = 0; i < cr.length; i++) { const r = cr[i]; if (r.width < 0.5 && r.height < 0.5) continue; rects.push({ x: r.left - rr.left, y: r.top - rr.top, w: r.width, h: r.height }); }
-      setSelRects(rects);
+      const cr = range.getClientRects();
+      ov.innerHTML = "";
+      for (let i = 0; i < cr.length; i++) {
+        const r = cr[i]; if (r.width < 0.5 && r.height < 0.5) continue;
+        const d = document.createElement("div");
+        d.style.cssText = "position:absolute;background:rgba(91,69,217,0.28);border-radius:2px;pointer-events:none;left:" + (r.left - rr.left) + "px;top:" + (r.top - rr.top) + "px;width:" + r.width + "px;height:" + r.height + "px;";
+        ov.appendChild(d);
+      }
       crossSelRef.current = { range: range.cloneRange() };
+      if (!xselRef.current) { xselRef.current = true; setXsel(true); }
     } catch (err) {}
+  };
+  const clearXSel = () => {
+    const ov = overlayRef.current; if (ov) ov.innerHTML = "";
+    crossSelRef.current = null;
+    if (xselRef.current) { xselRef.current = false; setXsel(false); }
   };
   // Seleciona TODOS os blocos do editor como texto contínuo (Ctrl/Cmd+A, 2º toque).
   const selectAllBlocks = () => {
@@ -9628,7 +9643,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     const startId = blockIdAt(e.clientX, e.clientY);
     if (!anchor || !startId) return;
     setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
-    setSelRects(null); crossSelRef.current = null;
+    clearXSel();
     const st: any = { anchor, startId, crossed: false };
     // Seleção de TEXTO contínua entre blocos: o navegador não estende a seleção
     // nativa entre contenteditables separados (clampa em um), então estendemos o
@@ -9682,7 +9697,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
         const ab = blk(s.anchorNode), fb = blk(s.focusNode);
         keep = !!(ab && fb && ab !== fb && root.contains(ab) && root.contains(fb));
       }
-      if (!keep) { setSelRects((p) => (p ? null : p)); crossSelRef.current = null; }
+      if (!keep) clearXSel();
     };
     // Ctrl/Cmd+A: 1º seleciona o bloco (nativo); 2º (bloco já todo selecionado)
     // seleciona TODOS os blocos como texto contínuo, pronto para copiar.
@@ -9795,10 +9810,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div ref={rootRef} onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (selRects ? "dc-xsel" : "")}>
-      {selRects && selRects.map((r: any, i: number) => (
-        <div key={"selr" + i} className="absolute bg-primary/30 rounded-[2px] pointer-events-none z-0" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
-      ))}
+    <div ref={rootRef} onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (xsel ? "dc-xsel" : "")}>
+      <div ref={overlayRef} aria-hidden="true" className="absolute inset-0 pointer-events-none z-0" />
       {(Array.isArray(list)?list:[]).map((block, i) => (
         <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
