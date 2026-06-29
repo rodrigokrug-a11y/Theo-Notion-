@@ -9297,6 +9297,12 @@ function FormatToolbar() {
   );
 }
 
+// Registro global das instâncias de editor com seleção entre blocos. A página tem
+// vários editores (o documento + cada toggle/coluna aninhado); só UMA seleção de
+// texto entre blocos pode estar viva por vez — ao iniciar uma em um editor, as
+// outras se limpam. Cada item é um objeto estável { clear() }.
+const XSEL_INSTANCES = new Set<any>();
+
 function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink, onUpdatePage, nested }: any) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [slash, setSlash] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
@@ -9319,6 +9325,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const overlayRef = useRef<HTMLDivElement | null>(null); // camada do realce próprio (imperativa)
   const xselRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const selfRef = useRef<any>(null); // objeto estável registrado no XSEL_INSTANCES
+  if (!selfRef.current) selfRef.current = { clear: () => {} };
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
   listRef.current = list;
@@ -9677,12 +9685,17 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     }
     if (!xselRef.current) { xselRef.current = true; setXsel(true); }
   };
-  const setModel = (aId: string, aOff: number, fId: string, fOff: number) => { const m = orderModel(aId, aOff, fId, fOff); if (!m) return; xsModelRef.current = m; paintModel(); };
+  // Limpa a seleção entre blocos de TODOS os outros editores da página (só uma
+  // pode estar viva por vez — documento + toggles/colunas aninhados).
+  const clearOtherXSel = () => { XSEL_INSTANCES.forEach((inst: any) => { if (inst !== selfRef.current && inst.clear) inst.clear(); }); };
+  const setModel = (aId: string, aOff: number, fId: string, fOff: number) => { const m = orderModel(aId, aOff, fId, fOff); if (!m) return; if (!xsModelRef.current) clearOtherXSel(); xsModelRef.current = m; paintModel(); };
   const clearXSel = () => {
     const ov = overlayRef.current; if (ov) ov.innerHTML = "";
     xsModelRef.current = null;
     if (xselRef.current) { xselRef.current = false; setXsel(false); }
   };
+  selfRef.current.clear = clearXSel; // mantém o registro global apontando p/ o clear atual
+  useEffect(() => { const me = selfRef.current; XSEL_INSTANCES.add(me); return () => { XSEL_INSTANCES.delete(me); }; }, []);
   // Conteúdo (html+texto) da seleção entre blocos, montado a partir do MODELO.
   const buildModelClip = () => {
     const m = xsModelRef.current; if (!m) return null;
@@ -9742,15 +9755,15 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     return (document.scrollingElement || document.documentElement) as any;
   };
   const onRootPointerDown = (e: any) => {
-    if (!canEdit || nested || selMode) return;
+    if (!canEdit || selMode) return; // (funciona também em editores aninhados — toggle/coluna)
     if (e.pointerType === "touch" || (e.button !== undefined && e.button !== 0)) return;
     const t = e.target as HTMLElement;
     if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
     if (csRef.current && csRef.current.cleanup) csRef.current.cleanup(); // aborta arraste pendente (reentrância)
-    clearXSel(); // um novo clique sempre encerra a seleção anterior
+    clearXSel(); clearOtherXSel(); // um novo clique encerra a seleção (deste e dos outros editores)
     const startId = blockIdAt(e.clientX, e.clientY);
     if (!startId) return;
-    if ((listRef.current || []).findIndex((b: any) => b.id === startId) === -1) return; // não inicia de dentro de coluna/toggle aninhado
+    if ((listRef.current || []).findIndex((b: any) => b.id === startId) === -1) return; // só inicia em um bloco DESTE editor (não de um aninhado mais profundo)
     const startEd = editableOf(startId); const anchor = caretAt(e.clientX, e.clientY);
     if (!startEd || !anchor) return;
     const anchorOff = charOffsetIn(startEd, anchor.node, anchor.offset);
@@ -9810,7 +9823,6 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   // cima dela, limpar ao clicar fora e Ctrl/Cmd+A para selecionar tudo. Como toda
   // Range usada fica dentro de UM bloco, funciona em todos os navegadores (iPad).
   useEffect(() => {
-    if (nested) return;
     const onCopy = (e: any) => {
       const c = buildModelClip(); if (!c || !e.clipboardData) return;
       try { e.clipboardData.setData("text/html", c.html); e.clipboardData.setData("text/plain", c.text); e.preventDefault(); } catch (err) {}
@@ -9833,6 +9845,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
         const root = rootRef.current; if (!root) return;
         const ae: any = document.activeElement;
         if (!ae || !ae.closest || !root.contains(ae)) return;
+        if (ae.closest("[data-blocks-root]") !== root) return; // só o editor MAIS INTERNO que contém o foco
         const blkEd = ae.closest('[contenteditable="true"]'); if (!blkEd) return;
         const s = window.getSelection();
         const full = (blkEd.textContent || "").length;
@@ -9961,7 +9974,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div ref={rootRef} onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (xsel ? "dc-xsel" : "")}>
+    <div ref={rootRef} data-blocks-root onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (xsel ? "dc-xsel" : "")}>
       <div ref={overlayRef} aria-hidden="true" className="absolute inset-0 pointer-events-none z-0" />
       {(Array.isArray(list)?list:[]).map((block, i) => (
         <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
