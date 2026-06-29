@@ -9624,7 +9624,15 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     for (let i = 0; i < rows.length; i++) { if (rows[i].getAttribute("data-blk-id") === id) return rows[i] as HTMLElement; }
     return null;
   };
-  const editableOf = (id: string): HTMLElement | null => { const r = rowOf(id); return r ? (r.querySelector('[contenteditable]') as HTMLElement | null) : null; };
+  // Editável de TEXTO próprio do bloco. Usa [contenteditable="true"] (a linha
+  // tem também a alça com contenteditable="false", que NÃO deve casar) e exige
+  // que o editável pertença a ESTA linha — blocos-contêiner (colunas) só têm
+  // editáveis em editores aninhados, então retornam null (tratados como unidade).
+  const editableOf = (id: string): HTMLElement | null => {
+    const r = rowOf(id); if (!r) return null;
+    const c = r.querySelector('[contenteditable="true"]') as HTMLElement | null;
+    return c && c.closest("[data-blk-id]") === r ? c : null;
+  };
   // Offset de caractere de (node,offset) dentro de `root` — Range com as DUAS
   // pontas no MESMO host, seguro em todos os navegadores (Safari/iPad inclusive).
   const charOffsetIn = (root: any, node: any, offset: number) => {
@@ -9665,7 +9673,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     ov.innerHTML = "";
     for (let i = si; i <= ei; i++) {
       const row = rowMap[ids[i]] as HTMLElement | undefined;
-      const ed = row ? (row.querySelector('[contenteditable]') as HTMLElement | null) : null;
+      const edC = row ? (row.querySelector('[contenteditable="true"]') as HTMLElement | null) : null;
+      const ed = edC && row && edC.closest("[data-blk-id]") === row ? edC : null; // ignora editáveis de editores aninhados (colunas)
       let rects: any[] = [];
       if (ed) {
         const full = (ed.textContent || "").length;
@@ -9696,6 +9705,17 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
   selfRef.current.clear = clearXSel; // mantém o registro global apontando p/ o clear atual
   useEffect(() => { const me = selfRef.current; XSEL_INSTANCES.add(me); return () => { XSEL_INSTANCES.delete(me); }; }, []);
+  // Serializa um bloco INTEIRO p/ a área de transferência, inclusive contêineres
+  // (colunas → cada coluna; toggle → título + filhos; tabela → linhas) cujo
+  // conteúdo NÃO vive em b.html. Recursivo para colunas/toggles aninhados.
+  function blocksClipHtml(bs: any[]): string { return (Array.isArray(bs) ? bs : []).map(blockClipHtml).filter(Boolean).join(""); }
+  function blockClipHtml(b: any): string {
+    if (!b) return "";
+    if (b.type === "columns" && Array.isArray(b.cols)) return b.cols.map((col: any) => "<div>" + blocksClipHtml(col) + "</div>").join("");
+    if (Array.isArray(b.children)) { const title = b.html ? "<div>" + b.html + "</div>" : ""; return title + blocksClipHtml(b.children); }
+    if (Array.isArray(b.rows)) return "<table>" + b.rows.map((r: any[]) => "<tr>" + r.map((c: any) => "<td>" + (c || "") + "</td>").join("") + "</tr>").join("") + "</table>";
+    return b.html ? b.html : "";
+  }
   // Conteúdo (html+texto) da seleção entre blocos, montado a partir do MODELO.
   const buildModelClip = () => {
     const m = xsModelRef.current; if (!m) return null;
@@ -9705,8 +9725,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     for (let i = si; i <= ei; i++) {
       const b = cur[i]; const ed = editableOf(b.id); const full = ed ? (ed.textContent || "").length : 0;
       let h: string;
-      if (i !== si && i !== ei) h = b.html || "";
-      else { const from = i === si ? m.startOff : 0; const to = i === ei ? m.endOff : full; h = ed ? htmlOfRange(ed, from, to) : (b.html || ""); }
+      if (i !== si && i !== ei) h = blockClipHtml(b); // bloco do meio inteiro (preserva colunas/toggle/tabela)
+      else { const from = i === si ? m.startOff : 0; const to = i === ei ? m.endOff : full; h = ed ? htmlOfRange(ed, from, to) : blockClipHtml(b); }
       htmls.push(h); texts.push(htmlToText(h));
     }
     return { html: htmls.map((h) => "<div>" + h + "</div>").join(""), text: texts.join("\n") };
@@ -9724,9 +9744,19 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     const after = eEd ? htmlOfRange(eEd, m.endOff, eFull) : "";
     const insH = insertText ? insertText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/ /g, " ") : "";
     const merged = before + insH + after;
-    const caretOff = m.startOff + (insertText ? insertText.length : 0);
-    const next = [...cur]; next.splice(si, ei - si + 1, { ...startBlk, html: merged });
-    pendingCaretRef.current = { id: startBlk.id, off: caretOff };
+    const next = [...cur];
+    if (sEd) {
+      // Início é um bloco de TEXTO: mantém o bloco e funde o html (comportamento normal).
+      next.splice(si, ei - si + 1, { ...startBlk, html: merged });
+      pendingCaretRef.current = { id: startBlk.id, off: m.startOff + (insertText ? insertText.length : 0) };
+    } else {
+      // Início é um bloco NÃO-texto (coluna/imagem/divisor… via "selecionar tudo"):
+      // NÃO enxerta html nele (geraria bloco malformado e descartaria irmãos). Substitui
+      // o intervalo por um parágrafo novo com o texto fundido.
+      const para: any = { ...newBlock("paragraph"), html: merged };
+      next.splice(si, ei - si + 1, para);
+      pendingCaretRef.current = { id: para.id, off: insertText ? insertText.length : 0 };
+    }
     clearXSel();
     onChange(next.length ? next : [newBlock()]);
     return true;
@@ -9761,6 +9791,9 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
     if (csRef.current && csRef.current.cleanup) csRef.current.cleanup(); // aborta arraste pendente (reentrância)
     clearXSel(); clearOtherXSel(); // um novo clique encerra a seleção (deste e dos outros editores)
+    // shift+clique e clique-duplo/triplo são gestos de EXTENSÃO nativa de seleção
+    // (estende, palavra, linha) — deixa o navegador cuidar; não inicia nosso arraste.
+    if (e.shiftKey || (e.detail || 0) > 1) return;
     const startId = blockIdAt(e.clientX, e.clientY);
     if (!startId) return;
     if ((listRef.current || []).findIndex((b: any) => b.id === startId) === -1) return; // só inicia em um bloco DESTE editor (não de um aninhado mais profundo)
