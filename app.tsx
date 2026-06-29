@@ -9842,10 +9842,11 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
       }
       if (!xsModelRef.current) return; // só age quando há seleção entre blocos viva
       if (e.ctrlKey || e.metaKey || e.altKey) return; // deixa atalhos (copiar dispara o evento copy)
-      // Se o foco já saiu para OUTRO campo editável (ex.: Tab para uma busca), não
-      // sequestra a digitação — encerra a seleção e deixa o padrão seguir.
+      // Se o foco já saiu para QUALQUER elemento focável fora do editor (campo de
+      // busca, botão, link…), não sequestra a tecla — encerra a seleção e deixa o
+      // padrão seguir. (body/html = foco "solto": ainda agimos sobre o modelo.)
       const aek: any = document.activeElement; const rk = rootRef.current;
-      if (aek && (aek.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(aek.tagName || "")) && rk && (!aek.closest || !rk.contains(aek))) { clearXSel(); return; }
+      if (aek && aek !== document.body && aek !== document.documentElement && rk && (!aek.closest || !rk.contains(aek))) { clearXSel(); return; }
       const k = e.key;
       if (k === "Backspace" || k === "Delete" || k === "Enter") { e.preventDefault(); e.stopPropagation(); deleteModel(); return; }
       if (k === "Escape") { clearXSel(); return; }
