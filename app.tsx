@@ -75,6 +75,9 @@ const SLASH_ITEMS = [
   { type: "embed_diagram", label: "Diagrama", desc: "Inserir um diagrama (novo ou existente)", display: "🗺️", style: "" },
   { type: "embed_canvas", label: "Caderno", desc: "Inserir um caderno de desenho", display: "🎨", style: "" },
   { type: "mermaid", label: "Diagrama por texto (Mermaid)", desc: "Escreva e vire fluxograma", display: "🧜", style: "" },
+  { type: "columns2", label: "2 colunas", desc: "Conteúdo lado a lado em 2 colunas", display: "▐▌", style: "text-xs font-bold tracking-tighter", kw: "colunas columns layout duas 2 lado a lado multiplas" },
+  { type: "columns3", label: "3 colunas", desc: "Conteúdo em 3 colunas", display: "❘❘❘", style: "text-xs font-bold tracking-tighter", kw: "colunas columns layout tres 3 multiplas" },
+  { type: "columns4", label: "4 colunas", desc: "Conteúdo em 4 colunas", display: "❘❘❘❘", style: "text-[10px] font-bold tracking-tighter", kw: "colunas columns layout quatro 4 multiplas" },
 ];
 
 const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😕 🙁 😣 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🤭 🤫 🤥 😶 😐 😑 😬 🙄 😯 😲 🥱 😴 🤤 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👻 💀 👽 👾 🤖 🎃 🤲 👐 🙌 👏 🤝 👍 👎 👊 ✊ 👌 ✋ 👋 🤙 💪 🦾 🙏 👁 👀 🧠 🗣 👤 👥 👶 👧 🧒 👦 👩 🧑 👨 👵 🧓 👴 🧕 👮 👷 💂 🕵 👰 🤵 👸 🤴 🦸 🦹 🧙 🧝 🧛 🧟 🧞 🧜 🧚 👼 🤰 💃 🕺 🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🐣 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🐘 🦏 🐪 🦒 🐃 🐂 🐄 🐎 🐖 🐑 🦙 🐐 🦌 🐕 🐈 🐓 🦃 🦚 🦜 🐇 🐉 🐲 🌵 🎄 🌲 🌳 🌴 🌱 🌿 🍀 🍃 🍂 🍁 🍄 🌾 💐 🌷 🌹 🌺 🌸 🌼 🌻 🌞 🌝 🌜 🌙 🌎 🌍 🌏 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☀️ ☁️ ❄️ ☃️ ⛄ 💨 💧 💦 🌊 🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥒 🌶 🌽 🥕 🥔 🍠 🥐 🍞 🥖 🥨 🧀 🥚 🍳 🥞 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🥪 🌮 🌯 🥗 🍝 🍜 🍲 🍛 🍣 🍱 🍤 🍙 🍚 🍘 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 🌰 🍯 🥛 🍼 ☕ 🍵 🥤 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🍾 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🏉 🎱 🏓 🏸 🥅 ⛳ 🏹 🎣 🥊 🥋 🛹 🎿 ⛷ 🏂 🏆 🥇 🥈 🥉 🏅 🎖 🎫 🎟 🎪 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎲 🎯 🎳 🎮 🚗 🚕 🚙 🚌 🚎 🏎 🚓 🚑 🚒 🚐 🚚 🚛 🚜 🛵 🏍 🚨 🚔 🚍 🚘 🚖 🚲 🛴 🚀 🛸 🚁 ✈️ 🚂 🚆 🚇 🚊 🚉 🛳 ⛵ 🚢 ⚓ 🚧 🚦 🗺 🗽 🏰 🏯 🏟 🎡 🎢 🎠 🏖 🏝 🏜 🌋 🏔 🗻 🏕 🏠 🏡 🏘 🏗 🏭 🏢 🏬 🏥 🏦 🏨 🏪 🏫 🏩 🏛 ⛪ 🕌 🕍 🌅 🌄 🌠 🌇 🌆 🏙 🌃 🌌 🌉 🌁 ⌚ 📱 💻 🖥 🖨 🖱 💾 💿 📷 📹 🎥 📞 ☎ 📺 📻 🔋 🔌 💡 🔦 🕯 💵 💴 💶 💷 💰 💳 💎 🔧 🔨 🛠 🔩 ⚙ 🧱 🔫 💣 🔪 🛡 🔮 📿 🔬 🔭 🩺 💊 💉 🧬 🧪 🌡 🧹 🚽 🚿 🛁 🧼 🛎 🔑 🚪 🛏 🛋 🧸 🛍 🛒 🎁 🎈 🎀 🎊 🎉 🎎 🏮 🧧 ✉ 📩 📨 📧 📥 📤 📦 📪 📫 📬 📮 📯 📜 📄 📑 🧾 📊 📈 📉 🗒 🗓 📆 📅 🗑 📁 📂 🗂 🗞 📰 📓 📔 📒 📕 📗 📘 📙 📚 📖 🔖 📎 📐 📏 📌 📍 ✂ 🖊 🖋 🖌 🖍 📝 ✏ 🔍 🔎 🔏 🔐 🔒 🔓".split(" ");
@@ -9376,10 +9379,15 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     if (type === "mermaid") { patch.html = "graph TD\n  A[Início] --> B{Decisão}\n  B -->|Sim| C[Faz isso]\n  B -->|Não| D[Faz aquilo]"; }
     if (type === "bookmark") { patch.url = ""; patch.html = ""; }
     if (type === "toc") { patch.html = ""; }
+    if (type === "columns2" || type === "columns3" || type === "columns4") {
+      const ncols = type === "columns2" ? 2 : type === "columns3" ? 3 : 4;
+      patch.type = "columns"; patch.html = "";
+      patch.cols = Array.from({ length: ncols }, () => [newBlock()]);
+    }
     const realType = patch.type || type;
     const next = [...list]; next[idx] = { ...cur, ...patch };
 
-    if (realType === "divider" || realType === "sketch" || realType === "toc") {
+    if (realType === "divider" || realType === "sketch" || realType === "toc" || realType === "columns") {
       const nb = newBlock("paragraph");
       next.splice(idx + 1, 0, nb);
       onChange(next); setSlash(null); setFocusId(nb.id);
@@ -9648,6 +9656,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     const anchor = caretAt(e.clientX, e.clientY);
     const startId = blockIdAt(e.clientX, e.clientY);
     if (!anchor || !startId) return;
+    if ((Array.isArray(list) ? list : []).findIndex((b: any) => b.id === startId) === -1) return; // não inicia de dentro de coluna/toggle aninhado
     setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
     clearXSel();
     const st: any = { anchor, startId, crossed: false, raf: 0, lastX: e.clientX, lastY: e.clientY, scroller: scrollerOf(rootRef.current) };
@@ -10446,6 +10455,7 @@ function BlockRenderer(props: any) {
     case "callout": return <CalloutBlock {...props} />;
     case "code": return <CodeBlock {...props} />;
     case "toggle": return <ToggleBlock {...props} />;
+    case "columns": return <ColumnsBlock {...props} />;
     case "image": return <ImageBlock {...props} />;
     case "table": return <TableBlock {...props} />;
     case "divider": return <DividerBlock {...props} />;
@@ -10904,6 +10914,22 @@ function TableBlock({ block, onUpdate, canEdit, autoFocus, onAutoFocused }: any)
           <button onClick={addCol} className="h-7 px-2 rounded-md text-xs text-muted-foreground hover:bg-accent inline-flex items-center gap-1" type="button">+ Coluna</button>
         </div>
       )}
+    </div>
+  );
+}
+
+// Bloco de COLUNAS: conteúdo lado a lado (2/3/4 colunas). Cada coluna é um
+// editor de blocos aninhado. Empilha em uma coluna só no celular.
+function ColumnsBlock({ block, onUpdate, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink, onUpdatePage }: any) {
+  const cols: any[] = Array.isArray(block.cols) && block.cols.length ? block.cols : [[newBlock()], [newBlock()]];
+  const setCol = (i: number, next: any[]) => onUpdate({ cols: cols.map((c: any, j: number) => (j === i ? next : c)) });
+  return (
+    <div className="my-1 flex flex-col sm:flex-row gap-2 sm:gap-5 w-full items-stretch">
+      {(Array.isArray(cols) ? cols : []).map((col: any, i: number) => (
+        <div key={i} className={"flex-1 min-w-0 " + (i > 0 ? "sm:border-l sm:border-border/40 sm:pl-5" : "")}>
+          <BlocksEditor blocks={Array.isArray(col) && col.length ? col : [newBlock()]} onChange={(next: any[]) => setCol(i, next)} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} onUpdatePage={onUpdatePage} nested />
+        </div>
+      ))}
     </div>
   );
 }
