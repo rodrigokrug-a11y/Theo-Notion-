@@ -9634,17 +9634,23 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     const f = eds[0], l = eds[eds.length - 1];
     paintCross(f, 0, l, l.childNodes.length);
   };
+  const scrollerOf = (el: any) => {
+    let n = el && el.parentElement;
+    while (n) { try { const s = getComputedStyle(n); if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) return n; } catch (e) {} n = n.parentElement; }
+    return (document.scrollingElement || document.documentElement) as any;
+  };
   const onRootPointerDown = (e: any) => {
     if (!canEdit || nested || selMode) return;
     if (e.pointerType === "touch" || (e.button !== undefined && e.button !== 0)) return;
     const t = e.target as HTMLElement;
     if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
+    if (csRef.current && csRef.current.cleanup) csRef.current.cleanup(); // aborta arraste pendente (reentrância)
     const anchor = caretAt(e.clientX, e.clientY);
     const startId = blockIdAt(e.clientX, e.clientY);
     if (!anchor || !startId) return;
     setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
     clearXSel();
-    const st: any = { anchor, startId, crossed: false };
+    const st: any = { anchor, startId, crossed: false, raf: 0, lastX: e.clientX, lastY: e.clientY, scroller: scrollerOf(rootRef.current) };
     // Seleção de TEXTO contínua entre blocos: o navegador não estende a seleção
     // nativa entre contenteditables separados (clampa em um), então estendemos o
     // Range com setBaseAndExtent e desenhamos o próprio realce com getClientRects.
@@ -9652,20 +9658,36 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
       const focus = caretAt(x, y); if (!focus) return;
       paintCross(st.anchor.node, st.anchor.offset, focus.node, focus.offset);
     };
+    // Auto-rolagem ao arrastar perto das bordas (documentos longos).
+    const tick = () => {
+      const sc = st.scroller; if (!sc || !st.crossed) { st.raf = 0; return; }
+      const isDoc = sc === document.scrollingElement || sc === document.documentElement;
+      const top = isDoc ? 0 : sc.getBoundingClientRect().top;
+      const bottom = isDoc ? window.innerHeight : sc.getBoundingClientRect().bottom;
+      const EDGE = 56, STEP = 14;
+      let dy = 0;
+      if (st.lastY < top + EDGE) dy = -STEP; else if (st.lastY > bottom - EDGE) dy = STEP;
+      if (dy) { sc.scrollTop += dy; span(st.lastX, st.lastY); st.raf = requestAnimationFrame(tick); }
+      else st.raf = 0;
+    };
     const move = (ev: any) => {
       const curId = blockIdAt(ev.clientX, ev.clientY);
       if (!st.crossed) { if (curId && curId !== st.startId) st.crossed = true; else return; } // dentro do bloco: seleção nativa
+      st.lastX = ev.clientX; st.lastY = ev.clientY;
       span(ev.clientX, ev.clientY);
       if (ev.cancelable) ev.preventDefault();
+      if (!st.raf) st.raf = requestAnimationFrame(tick);
     };
     const up = (ev: any) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
+      if (st.raf) { cancelAnimationFrame(st.raf); st.raf = 0; }
       if (st.crossed && ev && typeof ev.clientX === "number") span(ev.clientX, ev.clientY); // seleção final
       csRef.current = null;
     };
-    csRef.current = { cleanup: up };
+    st.dragging = true;
+    csRef.current = { cleanup: () => up(null) };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
