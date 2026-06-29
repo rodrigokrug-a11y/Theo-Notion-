@@ -9849,6 +9849,9 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
       st.anchorOff = aOff;
       setModel(st.startId, aOff, st.startId, fOff);
       window.addEventListener("touchmove", tmPrevent, { passive: false } as any);
+      // Captura o ponteiro para o arraste seguir chegando aqui (e não ser
+      // sequestrado pela seleção/lupa nativa do iOS).
+      try { const re: any = rootRef.current; if (re && re.setPointerCapture && e.pointerId != null) re.setPointerCapture(e.pointerId); } catch (e4) {}
       try { if ((navigator as any).vibrate) (navigator as any).vibrate(8); } catch (e3) {}
     };
     const cleanup = () => {
