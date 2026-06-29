@@ -37,9 +37,6 @@ export default function MyApp(props: any) {
         /* Título da página em preto (tema-aware) */
         .dc-titleink { color: #191613; }
         .dark .dc-titleink { color: #f2f0ea; }
-        /* Esconde o realce nativo (que clampa em 1 bloco) durante a seleção de texto entre blocos */
-        .dc-xsel ::selection { background: transparent; }
-        .dc-xsel ::-moz-selection { background: transparent; }
         *::-webkit-scrollbar { width: 11px; height: 11px; }
         *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
         *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); background-clip: content-box; }
@@ -9297,12 +9294,6 @@ function FormatToolbar() {
   );
 }
 
-// Registro global das instâncias de editor com seleção entre blocos. A página tem
-// vários editores (o documento + cada toggle/coluna aninhado); só UMA seleção de
-// texto entre blocos pode estar viva por vez — ao iniciar uma em um editor, as
-// outras se limpam. Cada item é um objeto estável { clear() }.
-const XSEL_INSTANCES = new Set<any>();
-
 function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, onCreateEmbed, onCreatePageLink, onUpdatePage, nested }: any) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [slash, setSlash] = useState<{ blockId: string; rect: DOMRect; query: string } | null>(null);
@@ -9315,21 +9306,11 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const [selMode, setSelMode] = useState(false); // modo de seleção (ferramenta de laço)
   const [marq, setMarq] = useState<any>(null); // retângulo do laço (coords no container)
   const [activeId, setActiveId] = useState<string | null>(null); // bloco com foco (mostra a alça no toque)
-  const [xsel, setXsel] = useState(false); // ativo = seleção de texto entre blocos (esconde realce nativo)
   const dragRef = useRef<any>(null);
   const selDragRef = useRef<any>(null);
-  const csRef = useRef<any>(null);
-  const xsModelRef = useRef<any>(null); // modelo lógico da seleção entre blocos {startId,startOff,endId,endOff}
-  const pendingCaretRef = useRef<any>(null); // (id,off) p/ recolocar o cursor após uma edição que remonta o html
-  const listRef = useRef<any[]>([]); // sempre o `list` mais recente (para os listeners do documento)
-  const overlayRef = useRef<HTMLDivElement | null>(null); // camada do realce próprio (imperativa)
-  const xselRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const selfRef = useRef<any>(null); // objeto estável registrado no XSEL_INSTANCES
-  if (!selfRef.current) selfRef.current = { clear: () => {} };
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
-  listRef.current = list;
 
   const updateBlock = (id: string, patch: any) => onChange((Array.isArray(list)?list:[]).map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
@@ -9549,7 +9530,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     window.addEventListener("pointercancel", up);
   };
   // Limpa listeners de arraste e poda a seleção se a lista mudar / desmontar.
-  useEffect(() => () => { [dragRef.current, csRef.current].forEach((st) => { if (st && st.cleanup) st.cleanup(); }); }, []);
+  useEffect(() => () => { const st = dragRef.current; if (st && st.cleanup) st.cleanup(); }, []);
   useEffect(() => {
     setSelIds((prev) => { const ok = prev.filter((id) => (Array.isArray(blocks) ? blocks : []).some((b: any) => b.id === id)); return ok.length === prev.length ? prev : ok; });
   }, [blocks]);
@@ -9598,339 +9579,6 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     }
   };
   const exitSel = () => { setSelMode(false); setSelIds([]); setMarq(null); };
-
-  // Seleção entre blocos (estilo Notion): arrastar com o mouse a partir do texto
-  // de um bloco para outro seleciona os blocos inteiros (o navegador não estende
-  // a seleção nativa entre contenteditables separados). No toque, use o laço.
-  const blockIdAt = (x: number, y: number) => {
-    const root = rootRef.current; if (!root) return null;
-    const el = document.elementFromPoint(x, y) as HTMLElement | null;
-    const b = el && el.closest ? el.closest("[data-blk-id]") : null;
-    return b && root.contains(b) ? b.getAttribute("data-blk-id") : null;
-  };
-  // Posição de caractere (nó+offset) sob as coordenadas — funciona em qualquer bloco.
-  const caretAt = (x: number, y: number): any => {
-    try {
-      const d: any = document;
-      if (d.caretRangeFromPoint) { const r = d.caretRangeFromPoint(x, y); if (r) return { node: r.startContainer, offset: r.startOffset }; }
-      else if (d.caretPositionFromPoint) { const p = d.caretPositionFromPoint(x, y); if (p) return { node: p.offsetNode, offset: p.offset }; }
-    } catch (e) {}
-    return null;
-  };
-  // Resolve a linha (row) e o contenteditable de um bloco de TOPO pelo id.
-  const rowOf = (id: string): HTMLElement | null => {
-    const root = rootRef.current; if (!root) return null;
-    const rows = root.querySelectorAll(":scope > [data-blk-id]");
-    for (let i = 0; i < rows.length; i++) { if (rows[i].getAttribute("data-blk-id") === id) return rows[i] as HTMLElement; }
-    return null;
-  };
-  // Editável de TEXTO próprio do bloco. Usa [contenteditable="true"] (a linha
-  // tem também a alça com contenteditable="false", que NÃO deve casar) e exige
-  // que o editável pertença a ESTA linha — blocos-contêiner (colunas) só têm
-  // editáveis em editores aninhados, então retornam null (tratados como unidade).
-  const editableOf = (id: string): HTMLElement | null => {
-    const r = rowOf(id); if (!r) return null;
-    const c = r.querySelector('[contenteditable="true"]') as HTMLElement | null;
-    return c && c.closest("[data-blk-id]") === r ? c : null;
-  };
-  // Offset de caractere de (node,offset) dentro de `root` — Range com as DUAS
-  // pontas no MESMO host, seguro em todos os navegadores (Safari/iPad inclusive).
-  const charOffsetIn = (root: any, node: any, offset: number) => {
-    try { const r = document.createRange(); r.selectNodeContents(root); r.setEnd(node, offset); return r.toString().length; } catch (e) { return 0; }
-  };
-  // Posição (node,offset) do n-ésimo caractere dentro de `root`.
-  const posAtChar = (root: any, target: number): any => {
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    let c = 0, n: any, last: any = null;
-    while ((n = w.nextNode())) { const L = (n.textContent || "").length; if (c + L >= target) return { node: n, offset: Math.max(0, target - c) }; c += L; last = n; }
-    if (last) return { node: last, offset: (last.textContent || "").length };
-    return { node: root, offset: 0 };
-  };
-  // HTML do trecho [from,to] (offsets de caractere) de um bloco — Range no mesmo host.
-  const htmlOfRange = (root: any, from: number, to: number) => {
-    try { const a = posAtChar(root, Math.min(from, to)), b = posAtChar(root, Math.max(from, to)); const r = document.createRange(); r.setStart(a.node, a.offset); r.setEnd(b.node, b.offset); const d = document.createElement("div"); d.appendChild(r.cloneContents()); return d.innerHTML; } catch (e) { return ""; }
-  };
-  // Ordena âncora/foco na ordem dos blocos (e, no mesmo bloco, por offset).
-  const orderModel = (aId: string, aOff: number, fId: string, fOff: number) => {
-    const ids = (listRef.current || []).map((b: any) => b.id);
-    const ai = ids.indexOf(aId), fi = ids.indexOf(fId);
-    if (ai === -1 || fi === -1) return null;
-    if (ai < fi || (ai === fi && aOff <= fOff)) return { startId: aId, startOff: aOff, endId: fId, endOff: fOff };
-    return { startId: fId, startOff: fOff, endId: aId, endOff: aOff };
-  };
-  // Desenha o realce próprio a partir do MODELO (um Range por bloco, mesmo host).
-  const paintModel = () => {
-    const root = rootRef.current, ov = overlayRef.current, m = xsModelRef.current;
-    if (!root || !ov || !m) return;
-    const ids = (listRef.current || []).map((b: any) => b.id);
-    const si = ids.indexOf(m.startId), ei = ids.indexOf(m.endId);
-    if (si === -1 || ei === -1) { ov.innerHTML = ""; return; }
-    // Indexa as linhas de topo uma única vez (hot path: roda a cada pointermove).
-    const rowMap: any = {};
-    const allRows = root.querySelectorAll(":scope > [data-blk-id]");
-    for (let r = 0; r < allRows.length; r++) rowMap[allRows[r].getAttribute("data-blk-id") as string] = allRows[r];
-    const rr = root.getBoundingClientRect();
-    ov.innerHTML = "";
-    for (let i = si; i <= ei; i++) {
-      const row = rowMap[ids[i]] as HTMLElement | undefined;
-      const edC = row ? (row.querySelector('[contenteditable="true"]') as HTMLElement | null) : null;
-      const ed = edC && row && edC.closest("[data-blk-id]") === row ? edC : null; // ignora editáveis de editores aninhados (colunas)
-      let rects: any[] = [];
-      if (ed) {
-        const full = (ed.textContent || "").length;
-        const from = i === si ? m.startOff : 0;
-        const to = i === ei ? m.endOff : full;
-        if (!(to <= from && si === ei)) {
-          try { const a = posAtChar(ed, Math.min(from, to)), b = posAtChar(ed, Math.max(from, to)); const r = document.createRange(); r.setStart(a.node, a.offset); r.setEnd(b.node, b.offset); rects = Array.from(r.getClientRects()); } catch (e) {}
-        }
-      }
-      if (!rects.length && i > si && i < ei && row) rects = [row.getBoundingClientRect()]; // bloco não-texto no meio
-      for (let k = 0; k < rects.length; k++) {
-        const x = rects[k]; if (x.width < 0.5 && x.height < 0.5) continue;
-        const d = document.createElement("div");
-        d.style.cssText = "position:absolute;background:rgba(91,69,217,0.28);border-radius:2px;pointer-events:none;left:" + (x.left - rr.left) + "px;top:" + (x.top - rr.top) + "px;width:" + x.width + "px;height:" + x.height + "px;";
-        ov.appendChild(d);
-      }
-    }
-    if (!xselRef.current) { xselRef.current = true; setXsel(true); }
-  };
-  // Limpa a seleção entre blocos de TODOS os outros editores da página (só uma
-  // pode estar viva por vez — documento + toggles/colunas aninhados).
-  const clearOtherXSel = () => { XSEL_INSTANCES.forEach((inst: any) => { if (inst !== selfRef.current && inst.clear) inst.clear(); }); };
-  const setModel = (aId: string, aOff: number, fId: string, fOff: number) => { const m = orderModel(aId, aOff, fId, fOff); if (!m) return; if (!xsModelRef.current) clearOtherXSel(); xsModelRef.current = m; paintModel(); };
-  const clearXSel = () => {
-    const ov = overlayRef.current; if (ov) ov.innerHTML = "";
-    xsModelRef.current = null;
-    if (xselRef.current) { xselRef.current = false; setXsel(false); }
-  };
-  selfRef.current.clear = clearXSel; // mantém o registro global apontando p/ o clear atual
-  useEffect(() => { const me = selfRef.current; XSEL_INSTANCES.add(me); return () => { XSEL_INSTANCES.delete(me); }; }, []);
-  // Serializa um bloco INTEIRO p/ a área de transferência, inclusive contêineres
-  // (colunas → cada coluna; toggle → título + filhos; tabela → linhas) cujo
-  // conteúdo NÃO vive em b.html. Recursivo para colunas/toggles aninhados.
-  function blocksClipHtml(bs: any[]): string { return (Array.isArray(bs) ? bs : []).map(blockClipHtml).filter(Boolean).join(""); }
-  function blockClipHtml(b: any): string {
-    if (!b) return "";
-    if (b.type === "columns" && Array.isArray(b.cols)) return b.cols.map((col: any) => "<div>" + blocksClipHtml(col) + "</div>").join("");
-    if (Array.isArray(b.children)) { const title = b.html ? "<div>" + b.html + "</div>" : ""; return title + blocksClipHtml(b.children); }
-    if (Array.isArray(b.rows)) return "<table>" + b.rows.map((r: any[]) => "<tr>" + r.map((c: any) => "<td>" + (c || "") + "</td>").join("") + "</tr>").join("") + "</table>";
-    return b.html ? b.html : "";
-  }
-  // Conteúdo (html+texto) da seleção entre blocos, montado a partir do MODELO.
-  const buildModelClip = () => {
-    const m = xsModelRef.current; if (!m) return null;
-    const cur = listRef.current || []; const ids = cur.map((b: any) => b.id);
-    const si = ids.indexOf(m.startId), ei = ids.indexOf(m.endId); if (si === -1 || ei === -1) return null;
-    const htmls: string[] = [], texts: string[] = [];
-    for (let i = si; i <= ei; i++) {
-      const b = cur[i]; const ed = editableOf(b.id); const full = ed ? (ed.textContent || "").length : 0;
-      let h: string;
-      if (i !== si && i !== ei) h = blockClipHtml(b); // bloco do meio inteiro (preserva colunas/toggle/tabela)
-      else { const from = i === si ? m.startOff : 0; const to = i === ei ? m.endOff : full; h = ed ? htmlOfRange(ed, from, to) : blockClipHtml(b); }
-      htmls.push(h); texts.push(htmlToText(h));
-    }
-    return { html: htmls.map((h) => "<div>" + h + "</div>").join(""), text: texts.join("\n") };
-  };
-  // Remove a seleção entre blocos (e, opcionalmente, digita um caractere por cima),
-  // fundindo o início do 1º bloco com o fim do último — tudo no estado/modelo.
-  const deleteModel = (insertText?: string) => {
-    const m = xsModelRef.current; if (!m) return false;
-    const cur = listRef.current || []; const ids = cur.map((b: any) => b.id);
-    const si = ids.indexOf(m.startId), ei = ids.indexOf(m.endId); if (si === -1 || ei === -1) return false;
-    const startBlk = cur[si], endBlk = cur[ei];
-    const sEd = editableOf(startBlk.id), eEd = editableOf(endBlk.id);
-    const before = sEd ? htmlOfRange(sEd, 0, m.startOff) : "";
-    const eFull = eEd ? (eEd.textContent || "").length : 0;
-    const after = eEd ? htmlOfRange(eEd, m.endOff, eFull) : "";
-    const insH = insertText ? insertText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/ /g, " ") : "";
-    const merged = before + insH + after;
-    const next = [...cur];
-    if (sEd) {
-      // Início é um bloco de TEXTO: mantém o bloco e funde o html (comportamento normal).
-      next.splice(si, ei - si + 1, { ...startBlk, html: merged });
-      pendingCaretRef.current = { id: startBlk.id, off: m.startOff + (insertText ? insertText.length : 0) };
-    } else {
-      // Início é um bloco NÃO-texto (coluna/imagem/divisor… via "selecionar tudo"):
-      // NÃO enxerta html nele (geraria bloco malformado e descartaria irmãos). Substitui
-      // o intervalo por um parágrafo novo com o texto fundido.
-      const para: any = { ...newBlock("paragraph"), html: merged };
-      next.splice(si, ei - si + 1, para);
-      pendingCaretRef.current = { id: para.id, off: insertText ? insertText.length : 0 };
-    }
-    clearXSel();
-    onChange(next.length ? next : [newBlock()]);
-    return true;
-  };
-  // Seleciona TODOS os blocos do editor como texto contínuo (Ctrl/Cmd+A, 2º toque).
-  const selectAllBlocks = () => {
-    const ids = (listRef.current || []).map((b: any) => b.id); if (!ids.length) return;
-    const lastEd = editableOf(ids[ids.length - 1]); const lastLen = lastEd ? (lastEd.textContent || "").length : 0;
-    setModel(ids[0], 0, ids[ids.length - 1], lastLen);
-  };
-  // Reposiciona o cursor após uma edição da seleção entre blocos que remontou o html.
-  useEffect(() => {
-    const pc = pendingCaretRef.current; if (!pc) return; pendingCaretRef.current = null;
-    try {
-      const ed = editableOf(pc.id); if (!ed) return;
-      ed.focus();
-      const pos = posAtChar(ed, pc.off);
-      const sel = window.getSelection(); const r = document.createRange();
-      r.setStart(pos.node, pos.offset); r.collapse(true);
-      sel?.removeAllRanges(); sel?.addRange(r);
-    } catch (e) {}
-  }, [blocks]);
-  const scrollerOf = (el: any) => {
-    let n = el && el.parentElement;
-    while (n) { try { const s = getComputedStyle(n); if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) return n; } catch (e) {} n = n.parentElement; }
-    return (document.scrollingElement || document.documentElement) as any;
-  };
-  const onRootPointerDown = (e: any) => {
-    if (!canEdit || selMode) return; // (funciona também em editores aninhados — toggle/coluna)
-    if (e.pointerType === "touch" || (e.button !== undefined && e.button !== 0)) return;
-    const t = e.target as HTMLElement;
-    if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
-    if (csRef.current && csRef.current.cleanup) csRef.current.cleanup(); // aborta arraste pendente (reentrância)
-    clearXSel(); clearOtherXSel(); // um novo clique encerra a seleção (deste e dos outros editores)
-    // shift+clique e clique-duplo/triplo são gestos de EXTENSÃO nativa de seleção
-    // (estende, palavra, linha) — deixa o navegador cuidar; não inicia nosso arraste.
-    if (e.shiftKey || (e.detail || 0) > 1) return;
-    const startId = blockIdAt(e.clientX, e.clientY);
-    if (!startId) return;
-    if ((listRef.current || []).findIndex((b: any) => b.id === startId) === -1) return; // só inicia em um bloco DESTE editor (não de um aninhado mais profundo)
-    const startEd = editableOf(startId); const anchor = caretAt(e.clientX, e.clientY);
-    if (!startEd || !anchor) return;
-    const anchorOff = charOffsetIn(startEd, anchor.node, anchor.offset);
-    // Colapsa a seleção nativa remanescente no ponto do clique: sem isso, iniciar
-    // um novo arraste de DENTRO do realce anterior dispara o arrastar-e-soltar
-    // nativo do texto (e nenhum pointermove chega) em vez de uma nova seleção.
-    try { const s = window.getSelection(); if (s) { s.removeAllRanges(); const cr = document.createRange(); cr.setStart(anchor.node, anchor.offset); cr.collapse(true); s.addRange(cr); } } catch (err) {}
-    setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
-    const st: any = { startId, anchorOff, crossed: false, raf: 0, lastX: e.clientX, lastY: e.clientY, scroller: scrollerOf(rootRef.current) };
-    // Estende a seleção como TEXTO até (x,y): grava o modelo lógico e redesenha o
-    // realce próprio (um Range por bloco — seguro no Safari/iPad). O navegador não
-    // estende a seleção nativa entre contenteditables separados, por isso o modelo.
-    const span = (x: number, y: number) => {
-      const fid = blockIdAt(x, y); if (!fid) return;
-      const fed = editableOf(fid); if (!fed) return; // fora de um bloco de topo
-      const fc = caretAt(x, y); if (!fc) return;
-      const fOff = charOffsetIn(fed, fc.node, fc.offset);
-      setModel(st.startId, st.anchorOff, fid, fOff);
-    };
-    // Auto-rolagem ao arrastar perto das bordas (documentos longos).
-    const tick = () => {
-      const sc = st.scroller; if (!sc || !st.crossed) { st.raf = 0; return; }
-      const isDoc = sc === document.scrollingElement || sc === document.documentElement;
-      const top = isDoc ? 0 : sc.getBoundingClientRect().top;
-      const bottom = isDoc ? window.innerHeight : sc.getBoundingClientRect().bottom;
-      const EDGE = 56, STEP = 14;
-      let dy = 0;
-      if (st.lastY < top + EDGE) dy = -STEP; else if (st.lastY > bottom - EDGE) dy = STEP;
-      if (dy) { sc.scrollTop += dy; span(st.lastX, st.lastY); st.raf = requestAnimationFrame(tick); }
-      else st.raf = 0;
-    };
-    const move = (ev: any) => {
-      const curId = blockIdAt(ev.clientX, ev.clientY);
-      if (!st.crossed) {
-        if (curId && curId !== st.startId && (listRef.current || []).findIndex((b: any) => b.id === curId) !== -1) st.crossed = true;
-        else return; // dentro do bloco (ou sobre área aninhada): seleção nativa
-      }
-      st.lastX = ev.clientX; st.lastY = ev.clientY;
-      span(ev.clientX, ev.clientY);
-      if (ev.cancelable) ev.preventDefault();
-      if (!st.raf) st.raf = requestAnimationFrame(tick);
-    };
-    const up = (ev: any) => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
-      if (st.raf) { cancelAnimationFrame(st.raf); st.raf = 0; }
-      if (st.crossed && ev && typeof ev.clientX === "number") span(ev.clientX, ev.clientY); // seleção final
-      csRef.current = null;
-    };
-    csRef.current = { cleanup: () => up(null) };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
-  };
-  // Copiar/recortar a seleção entre blocos (montada do MODELO), apagar/digitar por
-  // cima dela, limpar ao clicar fora e Ctrl/Cmd+A para selecionar tudo. Como toda
-  // Range usada fica dentro de UM bloco, funciona em todos os navegadores (iPad).
-  useEffect(() => {
-    const onCopy = (e: any) => {
-      const c = buildModelClip(); if (!c || !e.clipboardData) return;
-      try { e.clipboardData.setData("text/html", c.html); e.clipboardData.setData("text/plain", c.text); e.preventDefault(); } catch (err) {}
-    };
-    const onCut = (e: any) => {
-      const c = buildModelClip(); if (!c || !e.clipboardData) return;
-      try { e.clipboardData.setData("text/html", c.html); e.clipboardData.setData("text/plain", c.text); e.preventDefault(); deleteModel(); } catch (err) {}
-    };
-    // Clique FORA do editor encerra a seleção (cliques dentro são tratados pelo
-    // onRootPointerDown, que limpa e, se for o caso, recria a seleção).
-    const onDocPD = (e: any) => {
-      if (!xsModelRef.current) return;
-      const root = rootRef.current; const t = e.target as any;
-      if (root && t && t.closest && root.contains(t)) return;
-      clearXSel();
-    };
-    const onKey = (e: any) => {
-      // Ctrl/Cmd+A: 1º seleciona o bloco (nativo); 2º seleciona TODOS os blocos.
-      if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
-        const root = rootRef.current; if (!root) return;
-        const ae: any = document.activeElement;
-        if (!ae || !ae.closest || !root.contains(ae)) return;
-        if (ae.closest("[data-blocks-root]") !== root) return; // só o editor MAIS INTERNO que contém o foco
-        const blkEd = ae.closest('[contenteditable="true"]'); if (!blkEd) return;
-        const s = window.getSelection();
-        const full = (blkEd.textContent || "").length;
-        const allOfBlock = !!(s && !s.isCollapsed && (s.toString() || "").length >= full && full > 0);
-        if (allOfBlock || xsModelRef.current) { e.preventDefault(); selectAllBlocks(); }
-        return;
-      }
-      if (!xsModelRef.current) return; // só age quando há seleção entre blocos viva
-      if (e.ctrlKey || e.metaKey || e.altKey) return; // deixa atalhos (copiar dispara o evento copy)
-      // Se o foco já saiu para QUALQUER elemento focável fora do editor (campo de
-      // busca, botão, link…), não sequestra a tecla — encerra a seleção e deixa o
-      // padrão seguir. (body/html = foco "solto": ainda agimos sobre o modelo.)
-      const aek: any = document.activeElement; const rk = rootRef.current;
-      if (aek && aek !== document.body && aek !== document.documentElement && rk && (!aek.closest || !rk.contains(aek))) { clearXSel(); return; }
-      const k = e.key;
-      if (k === "Backspace" || k === "Delete" || k === "Enter") { e.preventDefault(); e.stopPropagation(); deleteModel(); return; }
-      if (k === "Escape") { clearXSel(); return; }
-      if (k && k.length === 1) { e.preventDefault(); e.stopPropagation(); deleteModel(k); return; } // digitar substitui a seleção
-      if (k && (k.indexOf("Arrow") === 0 || k === "Home" || k === "End" || k === "PageUp" || k === "PageDown")) clearXSel(); // navegar = desfaz a seleção
-    };
-    const onScroll = () => { if (xsModelRef.current) paintModel(); };
-    document.addEventListener("copy", onCopy);
-    document.addEventListener("cut", onCut);
-    document.addEventListener("pointerdown", onDocPD, true);
-    document.addEventListener("keydown", onKey, true);
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
-    return () => {
-      document.removeEventListener("copy", onCopy);
-      document.removeEventListener("cut", onCut);
-      document.removeEventListener("pointerdown", onDocPD, true);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [nested]);
-  // Copiar os blocos selecionados (texto + html) para a área de transferência.
-  const copySelected = async () => {
-    const cur = Array.isArray(list) ? list : [];
-    const chosen = cur.filter((b: any) => selIds.indexOf(b.id) !== -1);
-    if (!chosen.length) return;
-    const html = chosen.map((b: any) => "<div>" + (b.html || "") + "</div>").join("");
-    const text = chosen.map((b: any) => htmlToText(b.html || "")).join("\n");
-    try {
-      const CI = (window as any).ClipboardItem;
-      if (navigator.clipboard && CI) {
-        await navigator.clipboard.write([new CI({ "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]);
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(text);
-      }
-    } catch (e) { try { await navigator.clipboard.writeText(text); } catch (e2) {} }
-  };
 
   const insertMention = (page: any) => {
     try {
@@ -10007,8 +9655,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div ref={rootRef} data-blocks-root onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (xsel ? "dc-xsel" : "")}>
-      <div ref={overlayRef} aria-hidden="true" className="absolute inset-0 pointer-events-none z-0" />
+    <div ref={rootRef} className="space-y-1 relative">
       {(Array.isArray(list)?list:[]).map((block, i) => (
         <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
@@ -10070,30 +9717,16 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
         </div>
       )}
       {canEdit && !nested && (selMode || selIds.length > 0) && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-border shadow-2xl px-3 py-2 flex flex-wrap items-center justify-center gap-2 max-w-[94vw] animate-fade-in" style={{ backgroundColor: "hsl(var(--card))" }}>
-          {selMode && <span className="w-full sm:w-auto text-center text-[11px] text-muted-foreground">{selIds.length ? "toque p/ marcar mais · arraste uma área" : "arraste uma área sobre os blocos ou toque em cada um"}</span>}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-border shadow-2xl px-3 py-2 flex items-center gap-2 animate-fade-in" style={{ backgroundColor: "hsl(var(--card))" }}>
+          {selMode && <span className="hidden sm:inline text-[11px] text-muted-foreground">{selIds.length ? "arraste para marcar mais · toque alterna" : "arraste um retângulo sobre os blocos"}</span>}
           <span className="text-xs font-semibold text-foreground">{selIds.length} bloco{selIds.length === 1 ? "" : "s"}</span>
           <div className="w-px h-5 bg-border" />
           <button onClick={() => moveSel(-1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para cima" type="button">↑</button>
           <button onClick={() => moveSel(1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para baixo" type="button">↓</button>
-          <button onClick={copySelected} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Copiar seleção" type="button">⧉ Copiar</button>
           <button onClick={removeSelected} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-destructive hover:bg-destructive/10" : "text-muted-foreground/40")} type="button">🗑️ Excluir</button>
           <div className="w-px h-5 bg-border" />
           <button onClick={exitSel} className="text-xs font-semibold text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors" type="button">Concluir</button>
         </div>
-      )}
-      {/* Botão flutuante para entrar no modo de SELEÇÃO POR ÁREA (estilo caderno):
-          toque para ativar, depois arraste uma área sobre os blocos (ou toque em
-          cada um) para marcá-los e copiar/mover/excluir. Funciona no toque do iPad. */}
-      {canEdit && !nested && !selMode && selIds.length === 0 && (
-        <button onClick={() => setSelMode(true)} title="Selecionar blocos — arraste uma área sobre o texto" type="button"
-          className="fixed bottom-6 right-4 z-40 h-11 pl-3 pr-4 rounded-full border border-border shadow-xl flex items-center gap-2 text-xs font-semibold text-foreground active:scale-95 transition-transform"
-          style={{ backgroundColor: "hsl(var(--card))" }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 7V5a1 1 0 0 1 1-1h2" /><path d="M17 4h2a1 1 0 0 1 1 1v2" /><path d="M20 17v2a1 1 0 0 1-1 1h-2" /><path d="M7 20H5a1 1 0 0 1-1-1v-2" /><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" stroke="none" opacity="0.5" />
-          </svg>
-          Selecionar
-        </button>
       )}
       {slash && (<SlashMenu triggerRect={slash.rect} query={slash.query} onSelect={(t: string) => { if (!slash) return; if (t === "pagelink") { setPageLinkFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else if (t === "newpage") { setNewPageFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else { convertBlock(slash.blockId, t, slash.query); } }} onClose={() => setSlash(null)} />)}
       {mention && (<MentionMenu triggerRect={mention.rect} query={mention.query} pages={pages} onSelect={insertMention} onClose={() => setMention(null)} />)}
