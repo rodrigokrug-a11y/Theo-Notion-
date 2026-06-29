@@ -9313,12 +9313,15 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const dragRef = useRef<any>(null);
   const selDragRef = useRef<any>(null);
   const csRef = useRef<any>(null);
-  const crossSelRef = useRef<any>(null); // Range da seleção entre blocos (para copiar)
+  const xsModelRef = useRef<any>(null); // modelo lógico da seleção entre blocos {startId,startOff,endId,endOff}
+  const pendingCaretRef = useRef<any>(null); // (id,off) p/ recolocar o cursor após uma edição que remonta o html
+  const listRef = useRef<any[]>([]); // sempre o `list` mais recente (para os listeners do documento)
   const overlayRef = useRef<HTMLDivElement | null>(null); // camada do realce próprio (imperativa)
   const xselRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const list: any[] = Array.isArray(blocks) && blocks.length > 0 ? blocks : [newBlock()];
+  listRef.current = list;
 
   const updateBlock = (id: string, patch: any) => onChange((Array.isArray(list)?list:[]).map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
@@ -9606,42 +9609,133 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     } catch (e) {}
     return null;
   };
-  // Aplica uma seleção entre blocos (anchor→focus) e desenha o realce próprio
-  // DIRETAMENTE no DOM (sem re-render do React por movimento), a partir dos
-  // retângulos do range; guarda o range para copiar. (O realce nativo é clampado
-  // a um bloco pelo navegador, por isso desenhamos o nosso.)
-  const paintCross = (aN: any, aO: number, fN: any, fO: number) => {
-    try {
-      const s = window.getSelection(); if (!s || !s.setBaseAndExtent) return;
-      s.setBaseAndExtent(aN, aO, fN, fO);
-      const root = rootRef.current, ov = overlayRef.current; if (!s.rangeCount || !root || !ov) return;
-      const range = s.getRangeAt(0);
-      const rr = root.getBoundingClientRect();
-      const cr = range.getClientRects();
-      ov.innerHTML = "";
-      for (let i = 0; i < cr.length; i++) {
-        const r = cr[i]; if (r.width < 0.5 && r.height < 0.5) continue;
+  // Resolve a linha (row) e o contenteditable de um bloco de TOPO pelo id.
+  const rowOf = (id: string): HTMLElement | null => {
+    const root = rootRef.current; if (!root) return null;
+    const rows = root.querySelectorAll(":scope > [data-blk-id]");
+    for (let i = 0; i < rows.length; i++) { if (rows[i].getAttribute("data-blk-id") === id) return rows[i] as HTMLElement; }
+    return null;
+  };
+  const editableOf = (id: string): HTMLElement | null => { const r = rowOf(id); return r ? (r.querySelector('[contenteditable]') as HTMLElement | null) : null; };
+  // Offset de caractere de (node,offset) dentro de `root` — Range com as DUAS
+  // pontas no MESMO host, seguro em todos os navegadores (Safari/iPad inclusive).
+  const charOffsetIn = (root: any, node: any, offset: number) => {
+    try { const r = document.createRange(); r.selectNodeContents(root); r.setEnd(node, offset); return r.toString().length; } catch (e) { return 0; }
+  };
+  // Posição (node,offset) do n-ésimo caractere dentro de `root`.
+  const posAtChar = (root: any, target: number): any => {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    let c = 0, n: any, last: any = null;
+    while ((n = w.nextNode())) { const L = (n.textContent || "").length; if (c + L >= target) return { node: n, offset: Math.max(0, target - c) }; c += L; last = n; }
+    if (last) return { node: last, offset: (last.textContent || "").length };
+    return { node: root, offset: 0 };
+  };
+  // HTML do trecho [from,to] (offsets de caractere) de um bloco — Range no mesmo host.
+  const htmlOfRange = (root: any, from: number, to: number) => {
+    try { const a = posAtChar(root, Math.min(from, to)), b = posAtChar(root, Math.max(from, to)); const r = document.createRange(); r.setStart(a.node, a.offset); r.setEnd(b.node, b.offset); const d = document.createElement("div"); d.appendChild(r.cloneContents()); return d.innerHTML; } catch (e) { return ""; }
+  };
+  // Ordena âncora/foco na ordem dos blocos (e, no mesmo bloco, por offset).
+  const orderModel = (aId: string, aOff: number, fId: string, fOff: number) => {
+    const ids = (listRef.current || []).map((b: any) => b.id);
+    const ai = ids.indexOf(aId), fi = ids.indexOf(fId);
+    if (ai === -1 || fi === -1) return null;
+    if (ai < fi || (ai === fi && aOff <= fOff)) return { startId: aId, startOff: aOff, endId: fId, endOff: fOff };
+    return { startId: fId, startOff: fOff, endId: aId, endOff: aOff };
+  };
+  // Desenha o realce próprio a partir do MODELO (um Range por bloco, mesmo host).
+  const paintModel = () => {
+    const root = rootRef.current, ov = overlayRef.current, m = xsModelRef.current;
+    if (!root || !ov || !m) return;
+    const ids = (listRef.current || []).map((b: any) => b.id);
+    const si = ids.indexOf(m.startId), ei = ids.indexOf(m.endId);
+    if (si === -1 || ei === -1) { ov.innerHTML = ""; return; }
+    // Indexa as linhas de topo uma única vez (hot path: roda a cada pointermove).
+    const rowMap: any = {};
+    const allRows = root.querySelectorAll(":scope > [data-blk-id]");
+    for (let r = 0; r < allRows.length; r++) rowMap[allRows[r].getAttribute("data-blk-id") as string] = allRows[r];
+    const rr = root.getBoundingClientRect();
+    ov.innerHTML = "";
+    for (let i = si; i <= ei; i++) {
+      const row = rowMap[ids[i]] as HTMLElement | undefined;
+      const ed = row ? (row.querySelector('[contenteditable]') as HTMLElement | null) : null;
+      let rects: any[] = [];
+      if (ed) {
+        const full = (ed.textContent || "").length;
+        const from = i === si ? m.startOff : 0;
+        const to = i === ei ? m.endOff : full;
+        if (!(to <= from && si === ei)) {
+          try { const a = posAtChar(ed, Math.min(from, to)), b = posAtChar(ed, Math.max(from, to)); const r = document.createRange(); r.setStart(a.node, a.offset); r.setEnd(b.node, b.offset); rects = Array.from(r.getClientRects()); } catch (e) {}
+        }
+      }
+      if (!rects.length && i > si && i < ei && row) rects = [row.getBoundingClientRect()]; // bloco não-texto no meio
+      for (let k = 0; k < rects.length; k++) {
+        const x = rects[k]; if (x.width < 0.5 && x.height < 0.5) continue;
         const d = document.createElement("div");
-        d.style.cssText = "position:absolute;background:rgba(91,69,217,0.28);border-radius:2px;pointer-events:none;left:" + (r.left - rr.left) + "px;top:" + (r.top - rr.top) + "px;width:" + r.width + "px;height:" + r.height + "px;";
+        d.style.cssText = "position:absolute;background:rgba(91,69,217,0.28);border-radius:2px;pointer-events:none;left:" + (x.left - rr.left) + "px;top:" + (x.top - rr.top) + "px;width:" + x.width + "px;height:" + x.height + "px;";
         ov.appendChild(d);
       }
-      crossSelRef.current = { range: range.cloneRange() };
-      if (!xselRef.current) { xselRef.current = true; setXsel(true); }
-    } catch (err) {}
+    }
+    if (!xselRef.current) { xselRef.current = true; setXsel(true); }
   };
+  const setModel = (aId: string, aOff: number, fId: string, fOff: number) => { const m = orderModel(aId, aOff, fId, fOff); if (!m) return; xsModelRef.current = m; paintModel(); };
   const clearXSel = () => {
     const ov = overlayRef.current; if (ov) ov.innerHTML = "";
-    crossSelRef.current = null;
+    xsModelRef.current = null;
     if (xselRef.current) { xselRef.current = false; setXsel(false); }
+  };
+  // Conteúdo (html+texto) da seleção entre blocos, montado a partir do MODELO.
+  const buildModelClip = () => {
+    const m = xsModelRef.current; if (!m) return null;
+    const cur = listRef.current || []; const ids = cur.map((b: any) => b.id);
+    const si = ids.indexOf(m.startId), ei = ids.indexOf(m.endId); if (si === -1 || ei === -1) return null;
+    const htmls: string[] = [], texts: string[] = [];
+    for (let i = si; i <= ei; i++) {
+      const b = cur[i]; const ed = editableOf(b.id); const full = ed ? (ed.textContent || "").length : 0;
+      let h: string;
+      if (i !== si && i !== ei) h = b.html || "";
+      else { const from = i === si ? m.startOff : 0; const to = i === ei ? m.endOff : full; h = ed ? htmlOfRange(ed, from, to) : (b.html || ""); }
+      htmls.push(h); texts.push(htmlToText(h));
+    }
+    return { html: htmls.map((h) => "<div>" + h + "</div>").join(""), text: texts.join("\n") };
+  };
+  // Remove a seleção entre blocos (e, opcionalmente, digita um caractere por cima),
+  // fundindo o início do 1º bloco com o fim do último — tudo no estado/modelo.
+  const deleteModel = (insertText?: string) => {
+    const m = xsModelRef.current; if (!m) return false;
+    const cur = listRef.current || []; const ids = cur.map((b: any) => b.id);
+    const si = ids.indexOf(m.startId), ei = ids.indexOf(m.endId); if (si === -1 || ei === -1) return false;
+    const startBlk = cur[si], endBlk = cur[ei];
+    const sEd = editableOf(startBlk.id), eEd = editableOf(endBlk.id);
+    const before = sEd ? htmlOfRange(sEd, 0, m.startOff) : "";
+    const eFull = eEd ? (eEd.textContent || "").length : 0;
+    const after = eEd ? htmlOfRange(eEd, m.endOff, eFull) : "";
+    const insH = insertText ? insertText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/ /g, " ") : "";
+    const merged = before + insH + after;
+    const caretOff = m.startOff + (insertText ? insertText.length : 0);
+    const next = [...cur]; next.splice(si, ei - si + 1, { ...startBlk, html: merged });
+    pendingCaretRef.current = { id: startBlk.id, off: caretOff };
+    clearXSel();
+    onChange(next.length ? next : [newBlock()]);
+    return true;
   };
   // Seleciona TODOS os blocos do editor como texto contínuo (Ctrl/Cmd+A, 2º toque).
   const selectAllBlocks = () => {
-    const root = rootRef.current; if (!root) return;
-    const eds = Array.from(root.querySelectorAll('[contenteditable="true"]')) as HTMLElement[];
-    if (!eds.length) return;
-    const f = eds[0], l = eds[eds.length - 1];
-    paintCross(f, 0, l, l.childNodes.length);
+    const ids = (listRef.current || []).map((b: any) => b.id); if (!ids.length) return;
+    const lastEd = editableOf(ids[ids.length - 1]); const lastLen = lastEd ? (lastEd.textContent || "").length : 0;
+    setModel(ids[0], 0, ids[ids.length - 1], lastLen);
   };
+  // Reposiciona o cursor após uma edição da seleção entre blocos que remontou o html.
+  useEffect(() => {
+    const pc = pendingCaretRef.current; if (!pc) return; pendingCaretRef.current = null;
+    try {
+      const ed = editableOf(pc.id); if (!ed) return;
+      ed.focus();
+      const pos = posAtChar(ed, pc.off);
+      const sel = window.getSelection(); const r = document.createRange();
+      r.setStart(pos.node, pos.offset); r.collapse(true);
+      sel?.removeAllRanges(); sel?.addRange(r);
+    } catch (e) {}
+  }, [blocks]);
   const scrollerOf = (el: any) => {
     let n = el && el.parentElement;
     while (n) { try { const s = getComputedStyle(n); if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) return n; } catch (e) {} n = n.parentElement; }
@@ -9653,19 +9747,28 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     const t = e.target as HTMLElement;
     if (!t || !t.closest || !t.closest('[contenteditable="true"]')) return; // só a partir do texto
     if (csRef.current && csRef.current.cleanup) csRef.current.cleanup(); // aborta arraste pendente (reentrância)
-    const anchor = caretAt(e.clientX, e.clientY);
+    clearXSel(); // um novo clique sempre encerra a seleção anterior
     const startId = blockIdAt(e.clientX, e.clientY);
-    if (!anchor || !startId) return;
-    if ((Array.isArray(list) ? list : []).findIndex((b: any) => b.id === startId) === -1) return; // não inicia de dentro de coluna/toggle aninhado
+    if (!startId) return;
+    if ((listRef.current || []).findIndex((b: any) => b.id === startId) === -1) return; // não inicia de dentro de coluna/toggle aninhado
+    const startEd = editableOf(startId); const anchor = caretAt(e.clientX, e.clientY);
+    if (!startEd || !anchor) return;
+    const anchorOff = charOffsetIn(startEd, anchor.node, anchor.offset);
+    // Colapsa a seleção nativa remanescente no ponto do clique: sem isso, iniciar
+    // um novo arraste de DENTRO do realce anterior dispara o arrastar-e-soltar
+    // nativo do texto (e nenhum pointermove chega) em vez de uma nova seleção.
+    try { const s = window.getSelection(); if (s) { s.removeAllRanges(); const cr = document.createRange(); cr.setStart(anchor.node, anchor.offset); cr.collapse(true); s.addRange(cr); } } catch (err) {}
     setSelIds((prev) => (prev.length ? [] : prev)); // limpa seleção de bloco anterior
-    clearXSel();
-    const st: any = { anchor, startId, crossed: false, raf: 0, lastX: e.clientX, lastY: e.clientY, scroller: scrollerOf(rootRef.current) };
-    // Seleção de TEXTO contínua entre blocos: o navegador não estende a seleção
-    // nativa entre contenteditables separados (clampa em um), então estendemos o
-    // Range com setBaseAndExtent e desenhamos o próprio realce com getClientRects.
+    const st: any = { startId, anchorOff, crossed: false, raf: 0, lastX: e.clientX, lastY: e.clientY, scroller: scrollerOf(rootRef.current) };
+    // Estende a seleção como TEXTO até (x,y): grava o modelo lógico e redesenha o
+    // realce próprio (um Range por bloco — seguro no Safari/iPad). O navegador não
+    // estende a seleção nativa entre contenteditables separados, por isso o modelo.
     const span = (x: number, y: number) => {
-      const focus = caretAt(x, y); if (!focus) return;
-      paintCross(st.anchor.node, st.anchor.offset, focus.node, focus.offset);
+      const fid = blockIdAt(x, y); if (!fid) return;
+      const fed = editableOf(fid); if (!fed) return; // fora de um bloco de topo
+      const fc = caretAt(x, y); if (!fc) return;
+      const fOff = charOffsetIn(fed, fc.node, fc.offset);
+      setModel(st.startId, st.anchorOff, fid, fOff);
     };
     // Auto-rolagem ao arrastar perto das bordas (documentos longos).
     const tick = () => {
@@ -9681,7 +9784,10 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
     };
     const move = (ev: any) => {
       const curId = blockIdAt(ev.clientX, ev.clientY);
-      if (!st.crossed) { if (curId && curId !== st.startId) st.crossed = true; else return; } // dentro do bloco: seleção nativa
+      if (!st.crossed) {
+        if (curId && curId !== st.startId && (listRef.current || []).findIndex((b: any) => b.id === curId) !== -1) st.crossed = true;
+        else return; // dentro do bloco (ou sobre área aninhada): seleção nativa
+      }
       st.lastX = ev.clientX; st.lastY = ev.clientY;
       span(ev.clientX, ev.clientY);
       if (ev.cancelable) ev.preventDefault();
@@ -9695,59 +9801,72 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
       if (st.crossed && ev && typeof ev.clientX === "number") span(ev.clientX, ev.clientY); // seleção final
       csRef.current = null;
     };
-    st.dragging = true;
     csRef.current = { cleanup: () => up(null) };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
   };
-  // Copiar a seleção entre blocos (o navegador só copiaria 1 bloco) e limpar o
-  // realce quando a seleção colapsa (clique em outro lugar).
+  // Copiar/recortar a seleção entre blocos (montada do MODELO), apagar/digitar por
+  // cima dela, limpar ao clicar fora e Ctrl/Cmd+A para selecionar tudo. Como toda
+  // Range usada fica dentro de UM bloco, funciona em todos os navegadores (iPad).
   useEffect(() => {
     if (nested) return;
     const onCopy = (e: any) => {
-      const cs = crossSelRef.current; if (!cs || !cs.range || !e.clipboardData) return;
-      try {
-        const frag = cs.range.cloneContents();
-        const tmp = document.createElement("div"); tmp.appendChild(frag);
-        e.clipboardData.setData("text/html", tmp.innerHTML);
-        e.clipboardData.setData("text/plain", tmp.textContent || "");
-        e.preventDefault();
-      } catch (err) {}
+      const c = buildModelClip(); if (!c || !e.clipboardData) return;
+      try { e.clipboardData.setData("text/html", c.html); e.clipboardData.setData("text/plain", c.text); e.preventDefault(); } catch (err) {}
     };
-    const onSc = () => {
-      if (csRef.current) return; // arrastando
-      // Mantém o realce/range só enquanto a seleção viva continuar sendo ENTRE
-      // blocos DESTE editor; caso contrário (colapsou, virou um bloco só, ou foi
-      // para outro campo) limpa — evita que o copy global use um range velho.
-      const s = window.getSelection();
-      let keep = false;
-      const root = rootRef.current;
-      if (s && !s.isCollapsed && s.rangeCount && root) {
-        const blk = (n: any) => { const e = n && (n.nodeType === 1 ? n : n.parentElement); return e && e.closest ? e.closest("[data-blk-id]") : null; };
-        const ab = blk(s.anchorNode), fb = blk(s.focusNode);
-        keep = !!(ab && fb && ab !== fb && root.contains(ab) && root.contains(fb));
-      }
-      if (!keep) clearXSel();
+    const onCut = (e: any) => {
+      const c = buildModelClip(); if (!c || !e.clipboardData) return;
+      try { e.clipboardData.setData("text/html", c.html); e.clipboardData.setData("text/plain", c.text); e.preventDefault(); deleteModel(); } catch (err) {}
     };
-    // Ctrl/Cmd+A: 1º seleciona o bloco (nativo); 2º (bloco já todo selecionado)
-    // seleciona TODOS os blocos como texto contínuo, pronto para copiar.
+    // Clique FORA do editor encerra a seleção (cliques dentro são tratados pelo
+    // onRootPointerDown, que limpa e, se for o caso, recria a seleção).
+    const onDocPD = (e: any) => {
+      if (!xsModelRef.current) return;
+      const root = rootRef.current; const t = e.target as any;
+      if (root && t && t.closest && root.contains(t)) return;
+      clearXSel();
+    };
     const onKey = (e: any) => {
-      if (!((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A"))) return;
-      const root = rootRef.current; if (!root) return;
-      const ae: any = document.activeElement;
-      if (!ae || !ae.closest || !root.contains(ae)) return;
-      const blkEd = ae.closest('[contenteditable="true"]');
-      if (!blkEd) return;
-      const s = window.getSelection();
-      const full = (blkEd.textContent || "").length;
-      const allOfBlock = !!(s && !s.isCollapsed && (s.toString() || "").length >= full && full > 0);
-      if (allOfBlock || crossSelRef.current) { e.preventDefault(); selectAllBlocks(); }
+      // Ctrl/Cmd+A: 1º seleciona o bloco (nativo); 2º seleciona TODOS os blocos.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+        const root = rootRef.current; if (!root) return;
+        const ae: any = document.activeElement;
+        if (!ae || !ae.closest || !root.contains(ae)) return;
+        const blkEd = ae.closest('[contenteditable="true"]'); if (!blkEd) return;
+        const s = window.getSelection();
+        const full = (blkEd.textContent || "").length;
+        const allOfBlock = !!(s && !s.isCollapsed && (s.toString() || "").length >= full && full > 0);
+        if (allOfBlock || xsModelRef.current) { e.preventDefault(); selectAllBlocks(); }
+        return;
+      }
+      if (!xsModelRef.current) return; // só age quando há seleção entre blocos viva
+      if (e.ctrlKey || e.metaKey || e.altKey) return; // deixa atalhos (copiar dispara o evento copy)
+      // Se o foco já saiu para OUTRO campo editável (ex.: Tab para uma busca), não
+      // sequestra a digitação — encerra a seleção e deixa o padrão seguir.
+      const aek: any = document.activeElement; const rk = rootRef.current;
+      if (aek && (aek.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(aek.tagName || "")) && rk && (!aek.closest || !rk.contains(aek))) { clearXSel(); return; }
+      const k = e.key;
+      if (k === "Backspace" || k === "Delete" || k === "Enter") { e.preventDefault(); e.stopPropagation(); deleteModel(); return; }
+      if (k === "Escape") { clearXSel(); return; }
+      if (k && k.length === 1) { e.preventDefault(); e.stopPropagation(); deleteModel(k); return; } // digitar substitui a seleção
+      if (k && (k.indexOf("Arrow") === 0 || k === "Home" || k === "End" || k === "PageUp" || k === "PageDown")) clearXSel(); // navegar = desfaz a seleção
     };
+    const onScroll = () => { if (xsModelRef.current) paintModel(); };
     document.addEventListener("copy", onCopy);
-    document.addEventListener("selectionchange", onSc);
+    document.addEventListener("cut", onCut);
+    document.addEventListener("pointerdown", onDocPD, true);
     document.addEventListener("keydown", onKey, true);
-    return () => { document.removeEventListener("copy", onCopy); document.removeEventListener("selectionchange", onSc); document.removeEventListener("keydown", onKey, true); };
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      document.removeEventListener("copy", onCopy);
+      document.removeEventListener("cut", onCut);
+      document.removeEventListener("pointerdown", onDocPD, true);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
   }, [nested]);
   // Copiar os blocos selecionados (texto + html) para a área de transferência.
   const copySelected = async () => {
