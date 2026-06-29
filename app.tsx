@@ -10070,8 +10070,8 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
         </div>
       )}
       {canEdit && !nested && (selMode || selIds.length > 0) && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-border shadow-2xl px-3 py-2 flex items-center gap-2 animate-fade-in" style={{ backgroundColor: "hsl(var(--card))" }}>
-          {selMode && <span className="hidden sm:inline text-[11px] text-muted-foreground">{selIds.length ? "arraste para marcar mais · toque alterna" : "arraste um retângulo sobre os blocos"}</span>}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-border shadow-2xl px-3 py-2 flex flex-wrap items-center justify-center gap-2 max-w-[94vw] animate-fade-in" style={{ backgroundColor: "hsl(var(--card))" }}>
+          {selMode && <span className="w-full sm:w-auto text-center text-[11px] text-muted-foreground">{selIds.length ? "toque p/ marcar mais · arraste uma área" : "arraste uma área sobre os blocos ou toque em cada um"}</span>}
           <span className="text-xs font-semibold text-foreground">{selIds.length} bloco{selIds.length === 1 ? "" : "s"}</span>
           <div className="w-px h-5 bg-border" />
           <button onClick={() => moveSel(-1)} disabled={!selIds.length} className={"text-xs font-medium px-2 py-1 rounded-lg transition-colors " + (selIds.length ? "text-foreground hover:bg-accent" : "text-muted-foreground/40")} title="Mover seleção para cima" type="button">↑</button>
@@ -10081,6 +10081,19 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
           <div className="w-px h-5 bg-border" />
           <button onClick={exitSel} className="text-xs font-semibold text-primary hover:bg-primary/10 px-2 py-1 rounded-lg transition-colors" type="button">Concluir</button>
         </div>
+      )}
+      {/* Botão flutuante para entrar no modo de SELEÇÃO POR ÁREA (estilo caderno):
+          toque para ativar, depois arraste uma área sobre os blocos (ou toque em
+          cada um) para marcá-los e copiar/mover/excluir. Funciona no toque do iPad. */}
+      {canEdit && !nested && !selMode && selIds.length === 0 && (
+        <button onClick={() => setSelMode(true)} title="Selecionar blocos — arraste uma área sobre o texto" type="button"
+          className="fixed bottom-6 right-4 z-40 h-11 pl-3 pr-4 rounded-full border border-border shadow-xl flex items-center gap-2 text-xs font-semibold text-foreground active:scale-95 transition-transform"
+          style={{ backgroundColor: "hsl(var(--card))" }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 7V5a1 1 0 0 1 1-1h2" /><path d="M17 4h2a1 1 0 0 1 1 1v2" /><path d="M20 17v2a1 1 0 0 1-1 1h-2" /><path d="M7 20H5a1 1 0 0 1-1-1v-2" /><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" stroke="none" opacity="0.5" />
+          </svg>
+          Selecionar
+        </button>
       )}
       {slash && (<SlashMenu triggerRect={slash.rect} query={slash.query} onSelect={(t: string) => { if (!slash) return; if (t === "pagelink") { setPageLinkFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else if (t === "newpage") { setNewPageFor({ blockId: slash.blockId, query: slash.query }); setSlash(null); } else { convertBlock(slash.blockId, t, slash.query); } }} onClose={() => setSlash(null)} />)}
       {mention && (<MentionMenu triggerRect={mention.rect} query={mention.query} pages={pages} onSelect={insertMention} onClose={() => setMention(null)} />)}
