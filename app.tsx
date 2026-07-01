@@ -5162,19 +5162,21 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
         </button>
       </div>
 
-      {/* Criar — 3 botões (ícone) em uma linha */}
+      {/* Criar — botão principal "Nova página" + acesso rápido a caderno/diagrama */}
       {canEdit && (
         <div className="px-2 pt-3.5 shrink-0">
-          <div className={secLabel}>Criar</div>
-          <div className="flex items-center gap-1.5 px-1">
-            <button onClick={() => onCreate(null)} title="Nova página (⌘N)" className="flex-1 h-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors" type="button">
-              <SbChip bg="rgba(91,69,217,0.13)" fg="#5B45D9"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></SbChip>
+          <button onClick={() => onCreate(null)} title="Nova página (⌘N)" className="w-full h-9 flex items-center gap-2.5 px-2 rounded-lg bg-accent/60 hover:bg-accent text-foreground text-[13px] font-semibold transition-colors" type="button">
+            <span className="grid place-items-center h-6 w-6 rounded-md bg-primary/12 text-primary shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></span>
+            Nova página
+          </button>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <button onClick={() => onCreate(null, "canvas")} title="Novo caderno" className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground text-[12px] font-medium transition-colors" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L8 18l-4 1 1-4z" /></svg>
+              Caderno
             </button>
-            <button onClick={() => onCreate(null, "canvas")} title="Novo caderno" className="flex-1 h-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors" type="button">
-              <SbChip bg="rgba(190,122,30,0.16)" fg="#BE7A1E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L8 18l-4 1 1-4z" /></svg></SbChip>
-            </button>
-            <button onClick={() => onCreate(null, "diagram")} title="Novo diagrama" className="flex-1 h-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors" type="button">
-              <SbChip bg="rgba(30,142,126,0.15)" fg="#1E8E7E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg></SbChip>
+            <button onClick={() => onCreate(null, "diagram")} title="Novo diagrama" className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground text-[12px] font-medium transition-colors" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg>
+              Diagrama
             </button>
           </div>
         </div>
@@ -5208,52 +5210,6 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
                 <span className="flex-1 truncate">{p.title || "Sem título"}</span>
               </button>
             ))}
-          </div>
-        )}
-
-        {(allDiagrams.length > 0 || canEdit) && (
-          <div className="mb-3">
-            <div className="flex items-center justify-between pr-1">
-              <button onClick={() => setShowDiag((v) => !v)} className={secLabel + " pb-0 flex items-center gap-1 hover:text-foreground transition-colors"} type="button">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className={"transition-transform " + (showDiag ? "rotate-90" : "")}><path d="M9 6l6 6-6 6" /></svg>
-                Diagramas {allDiagrams.length > 0 && <span className="text-muted-foreground/60 font-normal">{allDiagrams.length}</span>}
-              </button>
-              {canEdit && <button onClick={() => { setShowDiag(true); onCreate(null, "diagram"); }} className="h-[18px] w-[18px] flex items-center justify-center rounded-[5px] text-muted-foreground/70 hover:bg-accent hover:text-foreground transition-colors" title="Novo diagrama" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></button>}
-            </div>
-            {showDiag && (
-              <div className="mt-1">
-                {(Array.isArray(allDiagrams)?allDiagrams:[]).map((p: any) => (
-                  <button key={p.id} onClick={() => onSelect(p.id)} className={navItem(activeId === p.id && view === "page")} type="button">
-                    <PageChip page={p} />
-                    <span className="flex-1 truncate">{p.title || "Sem título"}</span>
-                  </button>
-                ))}
-                {allDiagrams.length === 0 && <div className="px-2 py-1.5 text-[11px] text-muted-foreground/70 italic">Nenhum diagrama ainda.</div>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {(allCanvases.length > 0 || canEdit) && (
-          <div className="mb-3">
-            <div className="flex items-center justify-between pr-1">
-              <button onClick={() => setShowCanv((v) => !v)} className={secLabel + " pb-0 flex items-center gap-1 hover:text-foreground transition-colors"} type="button">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className={"transition-transform " + (showCanv ? "rotate-90" : "")}><path d="M9 6l6 6-6 6" /></svg>
-                Cadernos {allCanvases.length > 0 && <span className="text-muted-foreground/60 font-normal">{allCanvases.length}</span>}
-              </button>
-              {canEdit && <button onClick={() => { setShowCanv(true); onCreate(null, "canvas"); }} className="h-[18px] w-[18px] flex items-center justify-center rounded-[5px] text-muted-foreground/70 hover:bg-accent hover:text-foreground transition-colors" title="Novo caderno" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></button>}
-            </div>
-            {showCanv && (
-              <div className="mt-1">
-                {(Array.isArray(allCanvases)?allCanvases:[]).map((p: any) => (
-                  <button key={p.id} onClick={() => onSelect(p.id)} className={navItem(activeId === p.id && view === "page")} type="button">
-                    <PageChip page={p} />
-                    <span className="flex-1 truncate">{p.title || "Sem título"}</span>
-                  </button>
-                ))}
-                {allCanvases.length === 0 && <div className="px-2 py-1.5 text-[11px] text-muted-foreground/70 italic">Nenhum caderno ainda.</div>}
-              </div>
-            )}
           </div>
         )}
 
@@ -11720,11 +11676,11 @@ function SlashMenu({ triggerRect, query, onSelect, onClose }: any) {
   const left = Math.min(triggerRect.left, window.innerWidth - 320);
 
   return (
-    <div style={{ position: "fixed", top, left, zIndex: 99999, width: 300, backgroundColor: "hsl(var(--card))" }} className="rounded-xl border-2 border-border shadow-2xl overflow-hidden animate-fade-in">
+    <div onPointerDown={(e) => e.preventDefault()} style={{ position: "fixed", top, left, zIndex: 99999, width: 300, backgroundColor: "hsl(var(--card))" }} className="rounded-xl border-2 border-border shadow-2xl overflow-hidden animate-fade-in">
       <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider border-b-2 border-border">Blocos básicos</div>
       <div className="max-h-72 overflow-y-auto p-1">
         {(Array.isArray(filtered)?filtered:[]).map((it: any, i: number) => (
-          <button key={it.type} onClick={() => onSelect(it.type)} onMouseEnter={() => setActive(i)} className={"w-full flex items-center gap-3 px-2 py-1.5 text-left rounded-md transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent")} type="button">
+          <button key={it.type} onPointerDown={(e) => { e.preventDefault(); onSelect(it.type); }} onMouseEnter={() => setActive(i)} className={"w-full flex items-center gap-3 px-2 py-1.5 text-left rounded-md transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent")} type="button">
             <div className={"h-9 w-9 rounded-md bg-background border border-border flex items-center justify-center shrink-0 text-foreground leading-none overflow-hidden " + (it.style || "")}>{it.display}</div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-foreground truncate">{it.label}</div>
