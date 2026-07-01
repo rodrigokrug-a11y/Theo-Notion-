@@ -5582,6 +5582,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [clipReady, setClipReady] = useState<boolean>(!!(DIAGRAM_CLIP && DIAGRAM_CLIP.length)); // habilita botão "Colar"
   const [marquee, setMarquee] = useState<any>(null);
   const marqueeRef = useRef<any>(null);
+  const [snapLines, setSnapLines] = useState<any[] | null>(null); // guias do ímã ao arrastar
+  const [snapOn, setSnapOn] = useState(true); // ímã (alinhamento) ligado
   const [editing, setEditing] = useState<any>(null);   // {id, value, edge?}
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
@@ -5993,6 +5995,38 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     return nodesRef.current.filter((x: any) => x.group === n.group).map((x: any) => x.id);
   };
   const selectedNodeIds = (): string[] => (multiSel.length ? multiSel : (selected && selected.type === "node" ? [selected.id] : []));
+  // Alinha os nós selecionados (esquerda/centro/direita, topo/meio/base) pela
+  // caixa que os envolve. Só afeta os nós selecionados.
+  const alignNodes = (mode: string) => {
+    const ids = selectedNodeIds(); if (ids.length < 2) return;
+    const set = new Set(ids);
+    const sel = nodesRef.current.filter((n: any) => set.has(n.id));
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    sel.forEach((n: any) => { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h); });
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const s = snap();
+    const ns = nodesRef.current.map((n: any) => {
+      if (!set.has(n.id)) return n;
+      let x = n.x, y = n.y;
+      if (mode === "left") x = minX; else if (mode === "right") x = maxX - n.w; else if (mode === "hcenter") x = cx - n.w / 2;
+      else if (mode === "top") y = minY; else if (mode === "bottom") y = maxY - n.h; else if (mode === "vcenter") y = cy - n.h / 2;
+      return { ...n, x: Math.round(x), y: Math.round(y) };
+    });
+    commitFrom(s, ns, edgesRef.current);
+  };
+  // Distribui os nós selecionados com espaçamento uniforme no eixo dado.
+  const distributeNodes = (axis: "h" | "v") => {
+    const ids = selectedNodeIds(); if (ids.length < 3) return;
+    const set = new Set(ids);
+    const sel = nodesRef.current.filter((n: any) => set.has(n.id)).slice().sort((a: any, b: any) => (axis === "h" ? a.x - b.x : a.y - b.y));
+    const first = sel[0], last = sel[sel.length - 1];
+    const span = (axis === "h" ? last.x - first.x : last.y - first.y);
+    const step = span / (sel.length - 1);
+    const pos: any = {}; sel.forEach((n: any, i: number) => { pos[n.id] = Math.round((axis === "h" ? first.x : first.y) + step * i); });
+    const s = snap();
+    const ns = nodesRef.current.map((n: any) => (set.has(n.id) && pos[n.id] != null ? (axis === "h" ? { ...n, x: pos[n.id] } : { ...n, y: pos[n.id] }) : n));
+    commitFrom(s, ns, edgesRef.current);
+  };
   const groupSelected = () => {
     const ids = selectedNodeIds();
     if (ids.length < 2) return;
@@ -6493,9 +6527,30 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     const p = getPos(e);
     if (g.kind === "pan") { setTx(g.tx + (e.clientX - g.x)); setTy(g.ty + (e.clientY - g.y)); return; }
     if (g.kind === "drag") {
-      const dx = p.x - g.p0.x, dy = p.y - g.p0.y;
+      let dx = p.x - g.p0.x, dy = p.y - g.p0.y;
       if (Math.abs(dx) + Math.abs(dy) > 1) g.moved = true;
+      // ÍMÃ: alinha as bordas/centro do conjunto arrastado às bordas/centro dos
+      // outros nós quando ficam a menos de ~6px (em coords do diagrama). Mostra guias.
+      let guides: any[] = [];
+      if (snapOn) {
+        const idset = new Set(g.ids);
+        let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+        g.base.forEach((b: any) => { const nn = nodeById(b.id); if (!nn) return; const x = b.x + dx, y = b.y + dy; bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x + nn.w); by1 = Math.max(by1, y + nn.h); });
+        if (bx0 !== Infinity) {
+          const TH = 6 / scale;
+          const vT: number[] = [], hT: number[] = [];
+          nodesRef.current.forEach((n: any) => { if (idset.has(n.id) || DIAGRAM_LINE_SHAPES.indexOf(n.shape) !== -1) return; vT.push(n.x, n.x + n.w / 2, n.x + n.w); hT.push(n.y, n.y + n.h / 2, n.y + n.h); });
+          const dV = [bx0, (bx0 + bx1) / 2, bx1], dH = [by0, (by0 + by1) / 2, by1];
+          let bvAdj = TH + 1, bvShift = 0, gv: number | null = null;
+          dV.forEach((dvx) => vT.forEach((vx) => { const d = Math.abs(dvx - vx); if (d < bvAdj) { bvAdj = d; bvShift = vx - dvx; gv = vx; } }));
+          let bhAdj = TH + 1, bhShift = 0, gh: number | null = null;
+          dH.forEach((dhy) => hT.forEach((hy) => { const d = Math.abs(dhy - hy); if (d < bhAdj) { bhAdj = d; bhShift = hy - dhy; gh = hy; } }));
+          if (bvAdj <= TH) { dx += bvShift; guides.push({ v: gv }); }
+          if (bhAdj <= TH) { dy += bhShift; guides.push({ h: gh }); }
+        }
+      }
       moveNodesBy(g.base, dx, dy);
+      setSnapLines(guides.length ? guides : null);
       return;
     }
     if (g.kind === "marquee") {
@@ -6561,6 +6616,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     pointersRef.current.delete(e.pointerId);
     if (pinchRef.current) { const touches = Array.from(pointersRef.current.values()).filter((pp: any) => pp.type === "touch"); if (touches.length < 2) pinchRef.current = null; }
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (snapLines) setSnapLines(null); // some as guias do ímã
     const g = gestureRef.current;
     gestureRef.current = null;
     if (!g) return;
@@ -6803,6 +6859,11 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           {marquee && (
             <rect x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="hsl(var(--primary) / 0.08)" stroke="hsl(var(--primary))" strokeWidth={1 / scale} strokeDasharray={(4 / scale) + " " + (3 / scale)} />
           )}
+          {/* guias do ímã (alinhamento ao arrastar) */}
+          {snapLines && snapLines.map((l: any, i: number) => (l.v != null
+            ? <line key={"sv" + i} x1={l.v} y1={-100000} x2={l.v} y2={100000} stroke="#f43f5e" strokeWidth={1 / scale} pointerEvents="none" />
+            : <line key={"sh" + i} x1={-100000} y1={l.h} x2={100000} y2={l.h} stroke="#f43f5e" strokeWidth={1 / scale} pointerEvents="none" />
+          ))}
           {/* seleção múltipla / grupo */}
           {canEdit && effTool === "select" && multiSel.length > 1 && (() => {
             const sel = nodesRef.current.filter((n: any) => multiSel.indexOf(n.id) !== -1);
@@ -7028,6 +7089,23 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
             ) : (
               <button onClick={groupSelected} className="h-8 px-2.5 flex items-center gap-1.5 rounded-xl text-xs font-semibold text-primary hover:bg-accent transition-colors" title="Agrupar — movem juntos (Ctrl+G)" type="button">⧉ Agrupar ({sel.length})</button>
             )}
+            <div className="w-px h-5 bg-border" />
+            {(() => {
+              const aBtn = "h-8 w-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-foreground";
+              const ico = (paths: any) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">{paths}</svg>;
+              return (<>
+                <button onClick={() => alignNodes("left")} className={aBtn} title="Alinhar à esquerda" type="button">{ico(<><line x1="4" y1="4" x2="4" y2="20" /><rect x="7" y="6" width="11" height="4" rx="1" /><rect x="7" y="14" width="6" height="4" rx="1" /></>)}</button>
+                <button onClick={() => alignNodes("hcenter")} className={aBtn} title="Centralizar (horizontal)" type="button">{ico(<><line x1="12" y1="4" x2="12" y2="20" /><rect x="5" y="6" width="14" height="4" rx="1" /><rect x="8" y="14" width="8" height="4" rx="1" /></>)}</button>
+                <button onClick={() => alignNodes("right")} className={aBtn} title="Alinhar à direita" type="button">{ico(<><line x1="20" y1="4" x2="20" y2="20" /><rect x="6" y="6" width="11" height="4" rx="1" /><rect x="11" y="14" width="6" height="4" rx="1" /></>)}</button>
+                <button onClick={() => alignNodes("top")} className={aBtn} title="Alinhar ao topo" type="button">{ico(<><line x1="4" y1="4" x2="20" y2="4" /><rect x="6" y="7" width="4" height="11" rx="1" /><rect x="14" y="7" width="4" height="6" rx="1" /></>)}</button>
+                <button onClick={() => alignNodes("vcenter")} className={aBtn} title="Centralizar (vertical)" type="button">{ico(<><line x1="4" y1="12" x2="20" y2="12" /><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="8" width="4" height="8" rx="1" /></>)}</button>
+                <button onClick={() => alignNodes("bottom")} className={aBtn} title="Alinhar à base" type="button">{ico(<><line x1="4" y1="20" x2="20" y2="20" /><rect x="6" y="6" width="4" height="11" rx="1" /><rect x="14" y="11" width="4" height="6" rx="1" /></>)}</button>
+                {sel.length >= 3 && (<>
+                  <button onClick={() => distributeNodes("h")} className={aBtn} title="Distribuir na horizontal" type="button">{ico(<><rect x="3" y="8" width="4" height="8" rx="1" /><rect x="10" y="8" width="4" height="8" rx="1" /><rect x="17" y="8" width="4" height="8" rx="1" /></>)}</button>
+                  <button onClick={() => distributeNodes("v")} className={aBtn} title="Distribuir na vertical" type="button">{ico(<><rect x="8" y="3" width="8" height="4" rx="1" /><rect x="8" y="10" width="8" height="4" rx="1" /><rect x="8" y="17" width="8" height="4" rx="1" /></>)}</button>
+                </>)}
+              </>);
+            })()}
             <div className="w-px h-5 bg-border" />
             {fontStepper()}
             <div className="w-px h-5 bg-border" />
