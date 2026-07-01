@@ -6,13 +6,13 @@ export default function MyApp(props: any) {
         /* Redesign "papel quente": fundo #FBFAF6, tinta #1B1A17, acento índigo #5B45D9 */
         :root, .dark { --primary: 249 66% 56%; --primary-foreground: 0 0% 100%; --ring: 249 66% 56%; --destructive: 343 53% 53%; --destructive-foreground: 0 0% 100%; }
         :root {
-          --background: 48 33% 97%; --foreground: 45 9% 11%;
-          --card: 0 0% 100%; --card-foreground: 45 9% 11%;
-          --popover: 0 0% 100%; --popover-foreground: 45 9% 11%;
-          --muted: 44 27% 92%; --muted-foreground: 40 8% 49%;
-          --accent: 45 22% 92%; --accent-foreground: 42 13% 22%;
-          --secondary: 44 26% 93%; --secondary-foreground: 42 13% 22%;
-          --border: 42 22% 88%; --input: 42 22% 88%;
+          --background: 0 0% 100%; --foreground: 30 8% 12%;
+          --card: 0 0% 100%; --card-foreground: 30 8% 12%;
+          --popover: 0 0% 100%; --popover-foreground: 30 8% 12%;
+          --muted: 40 8% 95%; --muted-foreground: 30 4% 46%;
+          --accent: 40 8% 94%; --accent-foreground: 30 8% 18%;
+          --secondary: 40 8% 95%; --secondary-foreground: 30 8% 18%;
+          --border: 30 6% 90%; --input: 30 6% 90%;
         }
         .dark {
           --background: 40 8% 9%; --foreground: 45 14% 87%;
@@ -59,11 +59,11 @@ const SLASH_ITEMS = [
   { type: "h1", label: "Título 1", desc: "Cabeçalho grande", display: "H1", style: "text-sm font-bold" },
   { type: "h2", label: "Título 2", desc: "Cabeçalho médio", display: "H2", style: "text-sm font-bold" },
   { type: "h3", label: "Título 3", desc: "Cabeçalho pequeno", display: "H3", style: "text-xs font-bold" },
-  { type: "bullet", label: "Lista com marcadores", desc: "Lista simples", display: "•", style: "text-2xl leading-none" },
+  { type: "bullet", label: "Lista com marcadores", desc: "Lista simples", display: "•", style: "text-xl leading-none" },
   { type: "numbered", label: "Lista numerada", desc: "Lista com números", display: "1.", style: "text-sm font-semibold" },
   { type: "todo", label: "Lista de tarefas", desc: "Tarefas com checkbox", display: "☑", style: "text-lg" },
   { type: "toggle", label: "Alternar", desc: "Bloco que abre e fecha", display: "▶", style: "text-xs" },
-  { type: "quote", label: "Citação", desc: "Capture uma citação", display: '"', style: "text-3xl font-serif leading-none" },
+  { type: "quote", label: "Citação", desc: "Capture uma citação", display: '"', style: "text-2xl font-serif leading-none" },
   { type: "callout", label: "Destaque", desc: "Destaque informações", display: "💡", style: "" },
   { type: "code", label: "Código", desc: "Trecho de código", display: "{}", style: "text-xs font-mono font-bold" },
   { type: "divider", label: "Divisor", desc: "Linha separadora", display: "—", style: "text-xl leading-none" },
@@ -5121,23 +5121,21 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
         </button>
       </div>
 
-      {/* Criar */}
+      {/* Criar — 3 botões (ícone) em uma linha */}
       {canEdit && (
         <div className="px-2 pt-3.5 shrink-0">
           <div className={secLabel}>Criar</div>
-          <button onClick={() => onCreate(null)} className={navItem(false) + " font-medium"} type="button">
-            <SbChip bg="rgba(91,69,217,0.13)" fg="#5B45D9"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></SbChip>
-            <span className="flex-1">Nova página</span>
-            <span className="text-[11px] font-semibold text-muted-foreground/50">⌘N</span>
-          </button>
-          <button onClick={() => onCreate(null, "canvas")} className={navItem(false) + " font-medium"} type="button">
-            <SbChip bg="rgba(190,122,30,0.16)" fg="#BE7A1E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L8 18l-4 1 1-4z" /></svg></SbChip>
-            <span className="flex-1">Novo caderno</span>
-          </button>
-          <button onClick={() => onCreate(null, "diagram")} className={navItem(false) + " font-medium"} type="button">
-            <SbChip bg="rgba(30,142,126,0.15)" fg="#1E8E7E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg></SbChip>
-            <span className="flex-1">Novo diagrama</span>
-          </button>
+          <div className="flex items-center gap-1.5 px-1">
+            <button onClick={() => onCreate(null)} title="Nova página (⌘N)" className="flex-1 h-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors" type="button">
+              <SbChip bg="rgba(91,69,217,0.13)" fg="#5B45D9"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg></SbChip>
+            </button>
+            <button onClick={() => onCreate(null, "canvas")} title="Novo caderno" className="flex-1 h-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors" type="button">
+              <SbChip bg="rgba(190,122,30,0.16)" fg="#BE7A1E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 3.6a2 2 0 0 1 2.9 2.8L8 18l-4 1 1-4z" /></svg></SbChip>
+            </button>
+            <button onClick={() => onCreate(null, "diagram")} title="Novo diagrama" className="flex-1 h-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors" type="button">
+              <SbChip bg="rgba(30,142,126,0.15)" fg="#1E8E7E"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg></SbChip>
+            </button>
+          </div>
         </div>
       )}
 
@@ -10978,9 +10976,9 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
 
   const baseCls: any = {
     paragraph: "text-[15px] leading-[1.5] text-foreground py-[3px]",
-    h1: "dc-serif text-[30px] font-bold text-foreground pt-1 pb-0.5 mt-6",
-    h2: "dc-serif text-[24px] font-bold text-foreground pt-1 pb-0.5 mt-4",
-    h3: "dc-serif text-[19px] font-semibold text-foreground pt-0.5 pb-0.5 mt-3",
+    h1: "dc-serif text-[28px] font-bold text-foreground pt-1 pb-0.5 mt-5",
+    h2: "dc-serif text-[22px] font-bold text-foreground pt-1 pb-0.5 mt-4",
+    h3: "dc-serif text-[18px] font-semibold text-foreground pt-0.5 pb-0.5 mt-3",
     bullet: "text-[15px] leading-[1.5] text-foreground py-[2px]",
     numbered: "text-[15px] leading-[1.5] text-foreground py-[2px]",
     quote: "text-[15px] leading-[1.5] text-foreground py-[3px] italic border-l-[3px] border-primary pl-3 bg-muted/30 rounded-r-md",
@@ -11427,14 +11425,18 @@ function MentionMenu({ triggerRect, query, pages, onSelect, onClose }: any) {
 
   return (
     <div style={{ position: "fixed", top, left, zIndex: 99999, width: 250, backgroundColor: "hsl(var(--card))" }} className="rounded-xl border-2 border-border shadow-2xl overflow-hidden animate-fade-in">
-      <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider border-b-2 border-border">Mencionar página</div>
+      <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider border-b-2 border-border">Mencionar página, caderno ou diagrama</div>
       <div className="max-h-72 overflow-y-auto p-1">
-        {(Array.isArray(filtered)?filtered:[]).map((it: any, i: number) => (
-          <button key={it.id} onClick={() => onSelect(it)} onMouseEnter={() => setActive(i)} className={"w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent")} type="button">
-            <span className="text-base shrink-0">{pageIconNode(it.icon)}</span>
-            <span className="text-sm text-foreground truncate flex-1">{it.title || "Sem título"}</span>
-          </button>
-        ))}
+        {(Array.isArray(filtered)?filtered:[]).map((it: any, i: number) => {
+          const kind = isDiagramPage(it) ? "Diagrama" : isCanvasPage(it) ? "Caderno" : null;
+          return (
+            <button key={it.id} onClick={() => onSelect(it)} onMouseEnter={() => setActive(i)} className={"w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent")} type="button">
+              <span className="text-base shrink-0">{pageIconNode(it.icon)}</span>
+              <span className="text-sm text-foreground truncate flex-1">{it.title || "Sem título"}</span>
+              {kind && <span className="text-[10px] font-medium text-muted-foreground shrink-0 px-1.5 py-0.5 rounded bg-muted">{kind}</span>}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -11525,7 +11527,7 @@ function SlashMenu({ triggerRect, query, onSelect, onClose }: any) {
       <div className="max-h-72 overflow-y-auto p-1">
         {(Array.isArray(filtered)?filtered:[]).map((it: any, i: number) => (
           <button key={it.type} onClick={() => onSelect(it.type)} onMouseEnter={() => setActive(i)} className={"w-full flex items-center gap-3 px-2 py-1.5 text-left rounded-md transition-colors " + (i === active ? "bg-accent" : "hover:bg-accent")} type="button">
-            <div className={"h-9 w-9 rounded-md bg-background border-2 border-border flex items-center justify-center shrink-0 text-foreground " + (it.style || "")}>{it.display}</div>
+            <div className={"h-9 w-9 rounded-md bg-background border border-border flex items-center justify-center shrink-0 text-foreground leading-none overflow-hidden " + (it.style || "")}>{it.display}</div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-foreground truncate">{it.label}</div>
               <div className="text-xs text-muted-foreground truncate">{it.desc}</div>
