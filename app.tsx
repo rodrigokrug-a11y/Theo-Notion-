@@ -6366,6 +6366,29 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     return () => { node.removeEventListener("touchstart", block); node.removeEventListener("touchmove", block); };
   }, []);
 
+  // Colar imagem (Ctrl/Cmd+V) de uma fonte externa direto no diagrama.
+  useEffect(() => {
+    const onPaste = async (e: any) => {
+      const t: any = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (embedHeight && (!wrapRef.current || !wrapRef.current.contains(document.activeElement))) return;
+      if (!canEdit) return;
+      const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) as any[] : [];
+      const imgItem = items.find((it: any) => it.type && it.type.indexOf("image/") === 0);
+      if (!imgItem) return;
+      e.preventDefault();
+      const file = imgItem.getAsFile(); if (!file) return;
+      try {
+        const src = await readFileAsDataURL(file);
+        const dim = await imageDims(src);
+        addImageNodes([{ src, iw: dim.w, ih: dim.h }]);
+        toast("Imagem colada no diagrama", "success");
+      } catch (err) { toast("Não consegui colar a imagem", "error"); }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [canEdit, embedHeight]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t: any = e.target;
