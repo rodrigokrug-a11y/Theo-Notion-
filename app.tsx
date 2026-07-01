@@ -10397,7 +10397,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
         <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
           {canEdit && !selMode && (
-            <div contentEditable={false} className={"absolute left-1.5 top-1.5 transition-opacity flex items-center justify-center select-none z-50 " + (activeId === block.id ? "opacity-100" : "opacity-0 group-hover/block:opacity-100")}>
+            <div contentEditable={false} style={{ top: (block.type === "h1" ? 32 : block.type === "h2" ? 22 : block.type === "h3" ? 15 : block.type === "quote" ? 6 : 3) + "px" }} className={"absolute left-1.5 transition-opacity flex items-center justify-center select-none z-50 " + (activeId === block.id ? "opacity-100" : "opacity-0 group-hover/block:opacity-100")}>
               <button
                 onPointerDown={(e) => startHandleDrag(e, block, i)}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -11205,7 +11205,7 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
     <div key="ce" ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} className={"outline-none break-words " + blockCls + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
   );
 
-  if (block.type === "bullet") return (<div key="li-bullet" className="flex items-start gap-2.5 group"><span className="shrink-0 rounded-full bg-foreground select-none" style={{ width: "6px", height: "6px", marginTop: "8px" }} /><div className="flex-1 min-w-0">{inner}</div></div>);
+  if (block.type === "bullet") return (<div key="li-bullet" className="flex items-start gap-2.5 group"><span className="shrink-0 rounded-full select-none" style={{ width: "6px", height: "6px", marginTop: "9px", backgroundColor: "hsl(var(--foreground))" }} /><div className="flex-1 min-w-0">{inner}</div></div>);
   if (block.type === "numbered") {
     let n = 1;
     if (Array.isArray(allBlocks) && typeof listIndex === "number") {
