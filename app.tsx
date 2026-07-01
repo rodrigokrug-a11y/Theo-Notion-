@@ -6467,6 +6467,28 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         }
       }
     }
+    // alças de redimensionamento do GRUPO (multi-seleção) — escala todos juntos
+    if (canEdit && multiSel.length > 1) {
+      const sel = nodesRef.current.filter((n: any) => multiSel.indexOf(n.id) !== -1 && DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1);
+      if (sel.length > 1) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        sel.forEach((n: any) => { minX = Math.min(minX, n.x); minY = Math.min(minY, n.y); maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h); });
+        const pd = 8;
+        const gc = [
+          { x: minX - pd, y: minY - pd, ax: maxX + pd, ay: maxY + pd },
+          { x: maxX + pd, y: minY - pd, ax: minX - pd, ay: maxY + pd },
+          { x: maxX + pd, y: maxY + pd, ax: minX - pd, ay: minY - pd },
+          { x: minX - pd, y: maxY + pd, ax: maxX + pd, ay: minY - pd },
+        ];
+        for (const c of gc) {
+          if (Math.hypot(p.x - c.x, p.y - c.y) <= 12 / scale) {
+            const base = sel.map((n: any) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h }));
+            gestureRef.current = { kind: "gresize", ax: c.ax, ay: c.ay, w0: Math.abs(c.x - c.ax) || 1, h0: Math.abs(c.y - c.ay) || 1, base, moved: false, snap: snap() };
+            return;
+          }
+        }
+      }
+    }
     // âncoras → conectar (apenas no nó destacado/sob o cursor)
     if (canEdit) {
       for (const n of [...nodesRef.current].reverse()) {
@@ -6565,6 +6587,17 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       sizeNode(g.id, Math.round(nx), Math.round(ny), Math.round(nw), Math.round(nh));
       return;
     }
+    if (g.kind === "gresize") {
+      // Redimensiona TODA a seleção junto, proporcional, ancorado no canto oposto.
+      const s = Math.max(0.15, Math.min(Math.abs(p.x - g.ax) / g.w0, Math.abs(p.y - g.ay) / g.h0));
+      g.moved = true;
+      const ns = nodesRef.current.map((n: any) => {
+        const b = g.base.find((x: any) => x.id === n.id); if (!b) return n;
+        return { ...n, x: Math.round(g.ax + (b.x - g.ax) * s), y: Math.round(g.ay + (b.y - g.ay) * s), w: Math.max(30, Math.round(b.w * s)), h: Math.max(24, Math.round(b.h * s)) };
+      });
+      nodesRef.current = ns; setNodes(ns);
+      return;
+    }
     if (g.kind === "connect") {
       const tgt = nodeUnder(p);
       setEdgeDraft({ fromId: g.fromId, x: p.x, y: p.y, targetId: tgt && tgt.id !== g.fromId ? tgt.id : null });
@@ -6633,6 +6666,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (g.kind === "lineend" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "drag" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "resize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
+    else if (g.kind === "gresize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "marquee") {
       const m = marquee; marqueeRef.current = null; setMarquee(null);
@@ -6874,6 +6908,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               <g>
                 {sel.map((n: any) => (<rect key={"ms-" + n.id} x={n.x - 3} y={n.y - 3} width={n.w + 6} height={n.h + 6} rx={6} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.2 / scale} opacity={0.7} />))}
                 <rect x={minX - 8} y={minY - 8} width={maxX - minX + 16} height={maxY - minY + 16} rx={8} fill="hsl(var(--primary) / 0.05)" stroke="hsl(var(--primary))" strokeWidth={1.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} />
+                {[[minX - 8, minY - 8], [maxX + 8, minY - 8], [maxX + 8, maxY + 8], [minX - 8, maxY + 8]].map(([hx, hy]: any, i: number) => (
+                  <rect key={"gh" + i} x={hx - 5 / scale} y={hy - 5 / scale} width={10 / scale} height={10 / scale} rx={2 / scale} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.6 / scale} style={{ cursor: "nwse-resize" }} />
+                ))}
               </g>
             );
           })()}
