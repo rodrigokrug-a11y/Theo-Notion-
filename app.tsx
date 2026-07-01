@@ -5734,6 +5734,13 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
   const nodeById = (id: string) => nodesRef.current.find((n: any) => n.id === id);
   const centerOf = (n: any) => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
+  // Rotaciona um ponto (px,py) em torno de (cx,cy) por `deg` graus.
+  const rotPt = (px: number, py: number, cx: number, cy: number, deg: number) => {
+    if (!deg) return { x: px, y: py };
+    const a = (deg * Math.PI) / 180, co = Math.cos(a), si = Math.sin(a);
+    const dx = px - cx, dy = py - cy;
+    return { x: cx + dx * co - dy * si, y: cy + dx * si + dy * co };
+  };
   const borderPoint = (n: any, towardX: number, towardY: number) => {
     const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
     const dx = towardX - cx, dy = towardY - cy;
@@ -5807,7 +5814,11 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     { side: "bottom", x: n.x + n.w / 2, y: n.y + n.h },
     { side: "left", x: n.x, y: n.y + n.h / 2 },
   ];
-  const nodeUnder = (p: any) => [...nodesRef.current].reverse().find((n: any) => pointInBox(p, { x: n.x, y: n.y, w: n.w, h: n.h }, 0));
+  const nodeUnder = (p: any) => [...nodesRef.current].reverse().find((n: any) => {
+    const r = n.rot || 0;
+    const q = r ? rotPt(p.x, p.y, n.x + n.w / 2, n.y + n.h / 2, -r) : p; // leva o cursor ao referencial local da forma
+    return pointInBox(q, { x: n.x, y: n.y, w: n.w, h: n.h }, 0);
+  });
 
   const newNode = (shape: string, cx: number, cy: number) => {
     const pal = DIAGRAM_PALETTE[paletteIdx] || DIAGRAM_PALETTE[1];
@@ -6530,10 +6541,19 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       }
     }
 
-    // alças de redimensionamento (só com 1 nó selecionado; linhas usam as pontas)
+    // alças de rotação + redimensionamento (só com 1 nó selecionado; linhas usam as pontas)
     if (canEdit && selected && selected.type === "node" && multiSel.length <= 1) {
       const n = nodeById(selected.id);
       if (n && DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1) {
+        const cx = n.x + n.w / 2, cy = n.y + n.h / 2, rot = n.rot || 0;
+        const pl = rot ? rotPt(p.x, p.y, cx, cy, -rot) : p; // cursor no referencial local (sem rotação)
+        // alça de rotação: bolinha acima do topo (acima dos botões de "criar conectado")
+        const rhY = n.y - 5 - 46 / scale;
+        if (Math.hypot(pl.x - cx, pl.y - rhY) <= 14 / scale) {
+          const a0 = (Math.atan2(p.y - cy, p.x - cx) * 180) / Math.PI;
+          gestureRef.current = { kind: "rotate", id: n.id, cx, cy, off: rot - a0, moved: false, snap: snap() };
+          return;
+        }
         const corners = [
           { x: n.x, y: n.y, ox: n.x + n.w, oy: n.y + n.h },
           { x: n.x + n.w, y: n.y, ox: n.x, oy: n.y + n.h },
@@ -6541,8 +6561,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           { x: n.x, y: n.y + n.h, ox: n.x + n.w, oy: n.y },
         ];
         for (const c of corners) {
-          if (Math.hypot(p.x - c.x, p.y - c.y) <= 10 / scale) {
-            gestureRef.current = { kind: "resize", id: n.id, fx: c.ox, fy: c.oy, moved: false, snap: snap() };
+          if (Math.hypot(pl.x - c.x, pl.y - c.y) <= 10 / scale) {
+            const F = rot ? rotPt(c.ox, c.oy, cx, cy, rot) : { x: c.ox, y: c.oy }; // canto oposto fixo no mundo
+            gestureRef.current = { kind: "resize", id: n.id, fx: F.x, fy: F.y, rot, moved: false, snap: snap() };
             return;
           }
         }
@@ -6604,6 +6625,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const moveNodeTo = (id: string, x: number, y: number) => { const ns = nodesRef.current.map((n: any) => (n.id === id ? { ...n, x, y } : n)); nodesRef.current = ns; setNodes(ns); };
   const moveNodesBy = (base: any[], dx: number, dy: number) => { const ns = nodesRef.current.map((n: any) => { const b = base.find((x: any) => x.id === n.id); return b ? { ...n, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : n; }); nodesRef.current = ns; setNodes(ns); };
   const sizeNode = (id: string, x: number, y: number, w: number, h: number) => { const ns = nodesRef.current.map((n: any) => (n.id === id ? { ...n, x, y, w, h } : n)); nodesRef.current = ns; setNodes(ns); };
+  const rotateNode = (id: string, deg: number) => { const ns = nodesRef.current.map((n: any) => (n.id === id ? { ...n, rot: deg } : n)); nodesRef.current = ns; setNodes(ns); };
 
   const onPointerMove = (e: any) => {
     if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
@@ -6662,10 +6684,34 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       return;
     }
     if (g.kind === "resize") {
-      const nx = Math.min(g.fx, p.x), ny = Math.min(g.fy, p.y);
-      const nw = Math.max(40, Math.abs(p.x - g.fx)), nh = Math.max(30, Math.abs(p.y - g.fy));
       g.moved = true;
-      sizeNode(g.id, Math.round(nx), Math.round(ny), Math.round(nw), Math.round(nh));
+      const rot = g.rot || 0;
+      if (!rot) {
+        const nx = Math.min(g.fx, p.x), ny = Math.min(g.fy, p.y);
+        const nw = Math.max(40, Math.abs(p.x - g.fx)), nh = Math.max(30, Math.abs(p.y - g.fy));
+        sizeNode(g.id, Math.round(nx), Math.round(ny), Math.round(nw), Math.round(nh));
+      } else {
+        // Redimensiona mantendo o canto oposto FIXO no mundo, projetando o cursor
+        // nos eixos girados da forma (u = local-x, v = local-y).
+        const a = (rot * Math.PI) / 180, co = Math.cos(a), si = Math.sin(a);
+        const ux = co, uy = si, vx = -si, vy = co;
+        const ddx = p.x - g.fx, ddy = p.y - g.fy;
+        const av = ddx * ux + ddy * uy, bv = ddx * vx + ddy * vy;
+        const w = Math.max(40, Math.abs(av)), h = Math.max(30, Math.abs(bv));
+        const effA = (av < 0 ? -1 : 1) * w, effB = (bv < 0 ? -1 : 1) * h;
+        const ccx = g.fx + 0.5 * (effA * ux + effB * vx);
+        const ccy = g.fy + 0.5 * (effA * uy + effB * vy);
+        sizeNode(g.id, Math.round(ccx - w / 2), Math.round(ccy - h / 2), Math.round(w), Math.round(h));
+      }
+      return;
+    }
+    if (g.kind === "rotate") {
+      const a = (Math.atan2(p.y - g.cy, p.x - g.cx) * 180) / Math.PI;
+      let deg = ((a + g.off) % 360 + 360) % 360;
+      const near = Math.round(deg / 15) * 15;            // ímã: encaixa em múltiplos de 15°
+      if (Math.abs(deg - near) <= 4) deg = near % 360;
+      g.moved = true;
+      rotateNode(g.id, Math.round(deg));
       return;
     }
     if (g.kind === "gresize") {
@@ -6747,6 +6793,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (g.kind === "lineend" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "drag" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "resize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
+    else if (g.kind === "rotate" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "gresize" && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if ((g.kind === "edgecurve" || g.kind === "edgept") && g.moved) { commitFrom(g.snap, nodesRef.current, edgesRef.current); }
     else if (g.kind === "marquee") {
@@ -6867,7 +6914,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     return <polygon points={shapePoints({ kind: n.shape, x: n.x, y: n.y, w: n.w, h: n.h })} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
   };
   const renderNode = (n: any) => (
-    <g key={n.id}>
+    <g key={n.id} transform={n.rot ? `rotate(${n.rot} ${n.x + n.w / 2} ${n.y + n.h / 2})` : undefined}>
       {renderNodeShape(n)}
       {!(editing && editing.id === n.id) && (n.text || DIAGRAM_LINE_SHAPES.indexOf(n.shape) === -1) && (
         <foreignObject x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} style={{ pointerEvents: "none" }}>
@@ -7045,17 +7092,26 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
               </g>
             );
           })()}
-          {selNode && canEdit && effTool === "select" && multiSel.length <= 1 && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (
-            <g>
-              <rect x={selNode.x - 5} y={selNode.y - 5} width={selNode.w + 10} height={selNode.h + 10} rx={6} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} />
-              {[
-                { x: selNode.x, y: selNode.y }, { x: selNode.x + selNode.w, y: selNode.y },
-                { x: selNode.x + selNode.w, y: selNode.y + selNode.h }, { x: selNode.x, y: selNode.y + selNode.h },
-              ].map((c, i) => (
-                <rect key={i} x={c.x - 5 / scale} y={c.y - 5 / scale} width={10 / scale} height={10 / scale} rx={2.5 / scale} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.6 / scale} />
-              ))}
-            </g>
-          )}
+          {selNode && canEdit && effTool === "select" && multiSel.length <= 1 && DIAGRAM_LINE_SHAPES.indexOf(selNode.shape) === -1 && (() => {
+            const cx = selNode.x + selNode.w / 2, cy = selNode.y + selNode.h / 2;
+            const rhY = selNode.y - 5 - 46 / scale; // bolinha de rotação acima do topo (livre dos botões "+")
+            return (
+              <g transform={selNode.rot ? `rotate(${selNode.rot} ${cx} ${cy})` : undefined}>
+                <rect x={selNode.x - 5} y={selNode.y - 5} width={selNode.w + 10} height={selNode.h + 10} rx={6} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / scale} strokeDasharray={(6 / scale) + " " + (4 / scale)} />
+                {/* haste + alça de rotação (com ícone de giro) */}
+                <line x1={cx} y1={rhY + 7 / scale} x2={cx} y2={rhY + 16 / scale} stroke="hsl(var(--primary))" strokeWidth={1.3 / scale} />
+                <circle cx={cx} cy={rhY} r={8 / scale} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.8 / scale} style={{ cursor: "grab" }} />
+                <path d={`M ${cx - 3.4 / scale} ${rhY - 1.2 / scale} A ${3.4 / scale} ${3.4 / scale} 0 1 1 ${cx - 3.4 / scale} ${rhY + 1.2 / scale}`} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.4 / scale} strokeLinecap="round" style={{ pointerEvents: "none" }} />
+                <path d={`M ${cx - 4.9 / scale} ${rhY + 1.4 / scale} L ${cx - 3.4 / scale} ${rhY + 2.4 / scale} L ${cx - 2.2 / scale} ${rhY + 0.7 / scale}`} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.4 / scale} strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: "none" }} />
+                {[
+                  { x: selNode.x, y: selNode.y }, { x: selNode.x + selNode.w, y: selNode.y },
+                  { x: selNode.x + selNode.w, y: selNode.y + selNode.h }, { x: selNode.x, y: selNode.y + selNode.h },
+                ].map((c, i) => (
+                  <rect key={i} x={c.x - 5 / scale} y={c.y - 5 / scale} width={10 / scale} height={10 / scale} rx={2.5 / scale} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.6 / scale} />
+                ))}
+              </g>
+            );
+          })()}
           {/* Alças da seta selecionada: pontas (reconectar/mover) + curvar arrastando */}
           {canEdit && effTool === "select" && selected && selected.type === "edge" && (() => {
             const ed = edgesRef.current.find((x: any) => x.id === selected.id);
@@ -7081,7 +7137,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const n = ed ? nodeById(ed.id) : null;
         const active = !!(ed && n);
         const box: any = active
-          ? { left: n.x * scale + tx, top: n.y * scale + ty, width: n.w * scale, height: n.h * scale, opacity: 1 }
+          ? { left: n.x * scale + tx, top: n.y * scale + ty, width: n.w * scale, height: n.h * scale, opacity: 1, transform: n.rot ? `rotate(${n.rot}deg)` : undefined, transformOrigin: "center center" }
           : { left: 0, top: 0, width: 1, height: 1, opacity: 0, overflow: "hidden", pointerEvents: "none" };
         return (
           <div className="absolute z-40" style={box} onPointerDown={(e) => e.stopPropagation()}>
