@@ -6082,10 +6082,24 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const applyPalette = (idx: number) => {
     setPaletteIdx(idx);
     const pal = DIAGRAM_PALETTE[idx];
-    if (selected && selected.type === "node") {
-      commit(nodesRef.current.map((n: any) => (n.id === selected.id ? { ...n, bg: pal.bg, color: pal.border, textColor: pal.text } : n)), edgesRef.current);
+    const ids = selectedNodeIds();
+    if (ids.length) {
+      const set = new Set(ids);
+      commit(nodesRef.current.map((n: any) => (set.has(n.id) ? { ...n, bg: pal.bg, color: pal.border, textColor: pal.text } : n)), edgesRef.current);
     } else if (selected && selected.type === "edge") {
       commit(nodesRef.current, edgesRef.current.map((e: any) => (e.id === selected.id ? { ...e, color: pal.border } : e)));
+    }
+  };
+  // Texto legível (preto/branco) conforme a luminância do fundo.
+  const contrastText = (hex: string) => { try { const h = hex.replace("#", ""); const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#111827" : "#ffffff"; } catch (e) { return "#111827"; } };
+  // Cor personalizada (qualquer cor) aplicada aos nós selecionados (ou à aresta).
+  const applyFill = (hex: string) => {
+    const ids = selectedNodeIds();
+    if (ids.length) {
+      const set = new Set(ids); const txt = contrastText(hex);
+      commit(nodesRef.current.map((n: any) => (set.has(n.id) ? { ...n, bg: hex, color: hex, textColor: txt } : n)), edgesRef.current);
+    } else if (selected && selected.type === "edge") {
+      commit(nodesRef.current, edgesRef.current.map((e: any) => (e.id === selected.id ? { ...e, color: hex } : e)));
     }
   };
   const patchEdge = (patch: any) => {
@@ -7140,6 +7154,10 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
           {DIAGRAM_PALETTE.map((pal, i) => (
             <button key={i} onClick={() => applyPalette(i)} className={"w-7 h-7 rounded-full border transition-transform " + (paletteIdx === i ? "ring-2 ring-primary scale-110" : "hover:scale-110")} style={{ backgroundColor: pal.bg === "transparent" ? "#ffffff" : pal.bg, borderColor: pal.border }} title="Aplicar cor" type="button" />
           ))}
+          <div className="w-px h-6 bg-border mx-0.5" />
+          <label className="w-7 h-7 rounded-full border border-border/70 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform relative overflow-hidden shrink-0" title="Cor personalizada" style={{ background: "conic-gradient(from 90deg, #ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444)" }}>
+            <input type="color" onChange={(e: any) => applyFill(e.target.value)} className="absolute -inset-2 opacity-0 cursor-pointer" />
+          </label>
         </div>
       )}
 
