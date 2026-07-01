@@ -3747,7 +3747,7 @@ const CANVAS_SHAPES = [
   { id: "arrow", label: "Seta", icon: "↗" },
   { id: "darrow", label: "Seta dupla", icon: "↔" },
 ];
-const POLY_SHAPES = ["diamond", "pentagon", "hexagon", "octagon", "star", "parallelogram", "trapezoid", "cross"];
+const POLY_SHAPES = ["diamond", "pentagon", "hexagon", "octagon", "star", "parallelogram", "trapezoid", "cross", "invtrapezoid", "manualinput"];
 const LINE_KINDS = ["line", "arrow", "darrow"];
 const SHAPE_KINDS = ["rect", "ellipse", "triangle", "heart"].concat(POLY_SHAPES, LINE_KINDS);
 function rotPt(p: any, deg: number, c: any) {
@@ -3779,6 +3779,12 @@ function shapePoints(el: any) {
   }
   if (el.kind === "trapezoid") {
     return (r.x + r.w * 0.25) + "," + r.y + " " + (r.x + r.w * 0.75) + "," + r.y + " " + (r.x + r.w) + "," + (r.y + r.h) + " " + r.x + "," + (r.y + r.h);
+  }
+  if (el.kind === "invtrapezoid") { // Operação manual: topo largo, base estreita
+    return r.x + "," + r.y + " " + (r.x + r.w) + "," + r.y + " " + (r.x + r.w * 0.75) + "," + (r.y + r.h) + " " + (r.x + r.w * 0.25) + "," + (r.y + r.h);
+  }
+  if (el.kind === "manualinput") { // Entrada manual: topo inclinado
+    return r.x + "," + (r.y + r.h * 0.28) + " " + (r.x + r.w) + "," + r.y + " " + (r.x + r.w) + "," + (r.y + r.h) + " " + r.x + "," + (r.y + r.h);
   }
   if (el.kind === "cross") {
     const a = 0.34, b = 0.66;
@@ -3831,22 +3837,50 @@ const CANVAS_TEXT_SIZES = [
 
 // Formas e cores do módulo de diagramas (tipo Miro)
 const DIAGRAM_SHAPES = [
-  { id: "rect", label: "Caixa", icon: "▭" },
-  { id: "ellipse", label: "Elipse", icon: "◯" },
+  { id: "rect", label: "Processo", icon: "▭" },
   { id: "diamond", label: "Decisão", icon: "◇" },
-  { id: "triangle", label: "Triângulo", icon: "△" },
-  { id: "parallelogram", label: "Dado", icon: "▱" },
-  { id: "hexagon", label: "Hexágono", icon: "⬡" },
+  { id: "terminal", label: "Início/Fim", icon: "⬭" },
+  { id: "parallelogram", label: "Dados (E/S)", icon: "▱" },
+  { id: "cylinder", label: "Banco de dados", icon: "⛁" },
+  { id: "document", label: "Documento", icon: "🗎" },
+  { id: "predefined", label: "Sub-processo", icon: "▤" },
+  { id: "stored", label: "Dados armazenados", icon: "◖" },
+  { id: "display", label: "Display", icon: "◗" },
+  { id: "internalstorage", label: "Armazenamento", icon: "⊞" },
+  { id: "hexagon", label: "Preparação", icon: "⬡" },
+  { id: "invtrapezoid", label: "Operação manual", icon: "⏢" },
+  { id: "manualinput", label: "Entrada manual", icon: "⌂" },
+  { id: "ellipse", label: "Conector", icon: "◯" },
+  { id: "triangle", label: "Mesclar", icon: "△" },
   { id: "pentagon", label: "Pentágono", icon: "⬠" },
-  { id: "octagon", label: "Octógono", icon: "⛶" },
-  { id: "star", label: "Estrela", icon: "☆" },
   { id: "trapezoid", label: "Trapézio", icon: "⏢" },
-  { id: "cross", label: "Cruz", icon: "✚" },
+  { id: "star", label: "Estrela", icon: "☆" },
   { id: "line", label: "Linha", icon: "─" },
-  { id: "arrow", label: "Seta", icon: "↗" },
+  { id: "arrow", label: "Seta (fluxo)", icon: "↗" },
   { id: "darrow", label: "Seta dupla", icon: "↔" },
 ];
 const DIAGRAM_LINE_SHAPES = ["line", "arrow", "darrow"];
+// Legenda educativa das formas — texto original, escrito para este app.
+// Explica, em linguagem simples, o que cada símbolo costuma representar em um
+// fluxograma, para que quem monta o diagrama saiba qual usar em cada etapa.
+const FLOWCHART_HELP: { id: string; label: string; desc: string; ex?: string }[] = [
+  { id: "terminal", label: "Início / Fim", desc: "A “pílula” de cantos arredondados marca onde o fluxo começa e onde termina. Todo fluxograma tem pelo menos um início e um fim.", ex: "Ex.: “Início”, “Fim”, “Pedido recebido”." },
+  { id: "rect", label: "Processo", desc: "O retângulo é a forma mais usada: representa uma ação, tarefa ou etapa que transforma algo. Se algo “acontece” no fluxo, provavelmente é um processo.", ex: "Ex.: “Gerar nota fiscal”, “Somar valores”, “Enviar e-mail”." },
+  { id: "diamond", label: "Decisão", desc: "O losango é uma pergunta com resposta do tipo sim/não (ou verdadeiro/falso). Dele saem dois ou mais caminhos, cada um levando a um rumo diferente do fluxo.", ex: "Ex.: “Pagamento aprovado?” → Sim / Não." },
+  { id: "parallelogram", label: "Dados (Entrada/Saída)", desc: "O paralelogramo indica dados entrando ou saindo do processo — algo que é recebido ou entregue, sem detalhar como.", ex: "Ex.: “Ler formulário”, “Exibir resultado”." },
+  { id: "manualinput", label: "Entrada manual", desc: "Dados informados por uma pessoa na hora, geralmente pelo teclado ou por um formulário preenchido à mão.", ex: "Ex.: “Digitar senha”, “Preencher cadastro”." },
+  { id: "document", label: "Documento", desc: "O retângulo com a base ondulada representa um documento ou relatório produzido ou consultado no fluxo.", ex: "Ex.: “Emitir recibo”, “Gerar contrato”." },
+  { id: "predefined", label: "Sub-processo", desc: "O retângulo com barras laterais aponta para um processo já definido em outro lugar. Serve para não repetir um fluxo inteiro que você reaproveita.", ex: "Ex.: “Validar cadastro (ver fluxo à parte)”." },
+  { id: "cylinder", label: "Banco de dados", desc: "O cilindro representa informações guardadas em um banco de dados — dados que são gravados ou consultados.", ex: "Ex.: “Salvar no banco”, “Buscar cliente”." },
+  { id: "stored", label: "Dados armazenados", desc: "Uma forma genérica para dados guardados, quando você não quer especificar se é banco, arquivo ou memória.", ex: "Ex.: “Arquivo salvo”, “Histórico”." },
+  { id: "internalstorage", label: "Armazenamento interno", desc: "Indica dados mantidos na memória interna do sistema durante a execução.", ex: "Ex.: “Guardar em memória”." },
+  { id: "display", label: "Display", desc: "Representa uma informação mostrada ao usuário em uma tela ou monitor.", ex: "Ex.: “Mostrar mensagem”, “Exibir gráfico”." },
+  { id: "hexagon", label: "Preparação", desc: "O hexágono indica um passo de preparação ou ajuste antes do processo principal — configurar algo, iniciar um laço, definir um valor inicial.", ex: "Ex.: “Definir contador = 0”, “Iniciar repetição”." },
+  { id: "invtrapezoid", label: "Operação manual", desc: "Uma tarefa feita por uma pessoa, sem automação — algo que exige trabalho manual.", ex: "Ex.: “Conferir pacote”, “Assinar documento”." },
+  { id: "ellipse", label: "Conector", desc: "O círculo é um conector: liga uma parte do fluxo a outra na mesma página, evitando cruzar setas por cima do desenho. Use um par com o mesmo rótulo (A → A).", ex: "Ex.: “A”, “1”." },
+  { id: "triangle", label: "Mesclar / Junção", desc: "O triângulo indica a junção de vários caminhos em um só, ou um passo de combinar/ordenar informações.", ex: "Ex.: caminhos “Sim” e “Não” voltando a se unir." },
+  { id: "arrow", label: "Setas e linhas (fluxo)", desc: "As linhas e setas conectam as formas e mostram a ordem em que as etapas acontecem. A ponta da seta aponta para o próximo passo. Este é o “fio” que dá sentido ao fluxograma.", ex: "Dica: uma decisão costuma ter uma seta para cada resposta." },
+];
 // Linha/seta tratadas como vetor: as duas pontas vivem em cantos opostos da
 // bbox (x,y,w,h); flip escolhe a diagonal e rev qual ponta é o início/fim.
 function lineEnds(n: any) {
@@ -4126,6 +4160,13 @@ function ShapeIcon({ kind, size = 15 }: any) {
       </g>
     );
   }
+  else if (kind === "terminal") node = <rect x={2} y={size * 0.28} width={size - 4} height={size * 0.44} rx={size * 0.22} fill="none" stroke="currentColor" strokeWidth={1.5} />;
+  else if (kind === "cylinder") { const w = size - 4, x = 2, y = 2, h = size - 4, ry = h * 0.18; node = <g><path d={`M ${x} ${y + ry} A ${w / 2} ${ry} 0 0 1 ${x + w} ${y + ry} L ${x + w} ${y + h - ry} A ${w / 2} ${ry} 0 0 1 ${x} ${y + h - ry} Z`} fill="none" stroke="currentColor" strokeWidth={1.3} /><path d={`M ${x} ${y + ry} A ${w / 2} ${ry} 0 0 0 ${x + w} ${y + ry}`} fill="none" stroke="currentColor" strokeWidth={1.3} /></g>; }
+  else if (kind === "document") { const w = size - 4, x = 2, y = 3, h = size - 6, wy = h * 0.22; node = <path d={`M ${x} ${y} L ${x + w} ${y} L ${x + w} ${y + h - wy} C ${x + w * 0.7} ${y + h - wy * 2.6} ${x + w * 0.3} ${y + h + wy} ${x} ${y + h - wy} Z`} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinejoin="round" />; }
+  else if (kind === "predefined") { const w = size - 4, x = 2, y = 3, h = size - 6, d = w * 0.16; node = <g><rect x={x} y={y} width={w} height={h} rx={1.5} fill="none" stroke="currentColor" strokeWidth={1.3} /><line x1={x + d} y1={y} x2={x + d} y2={y + h} stroke="currentColor" strokeWidth={1.1} /><line x1={x + w - d} y1={y} x2={x + w - d} y2={y + h} stroke="currentColor" strokeWidth={1.1} /></g>; }
+  else if (kind === "stored") { const w = size - 4, x = 2, y = 2, h = size - 4, c = w * 0.2; node = <path d={`M ${x + c} ${y} L ${x + w} ${y} A ${c} ${h / 2} 0 0 1 ${x + w} ${y + h} L ${x + c} ${y + h} A ${c} ${h / 2} 0 0 1 ${x + c} ${y} Z`} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinejoin="round" />; }
+  else if (kind === "display") { const w = size - 4, x = 2, y = 2, h = size - 4, c = w * 0.24; node = <path d={`M ${x + c} ${y} L ${x + w * 0.8} ${y} L ${x + w} ${y + h / 2} L ${x + w * 0.8} ${y + h} L ${x + c} ${y + h} A ${c} ${h / 2} 0 0 1 ${x + c} ${y} Z`} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinejoin="round" />; }
+  else if (kind === "internalstorage") { const w = size - 4, x = 2, y = 2, h = size - 4, p = Math.min(w, h) * 0.3; node = <g><rect x={x} y={y} width={w} height={h} rx={1.5} fill="none" stroke="currentColor" strokeWidth={1.3} /><line x1={x + p} y1={y} x2={x + p} y2={y + h} stroke="currentColor" strokeWidth={1.1} /><line x1={x} y1={y + p} x2={x + w} y2={y + p} stroke="currentColor" strokeWidth={1.1} /></g>; }
   else node = <polygon points={shapePoints(el)} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />;
   return <svg width={size} height={size} viewBox={"0 0 " + size + " " + size} className="shrink-0">{node}</svg>;
 }
@@ -5569,6 +5610,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   const [dgBg, setDgBg] = useState<any>(() => (initBlock.bg && typeof initBlock.bg === "object") ? initBlock.bg : { color: "", pattern: "dots" });
   const dgBgRef = useRef(dgBg); dgBgRef.current = dgBg;
   const [bgMenu, setBgMenu] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const [title, setTitle] = useState(page.title || "");
   const [nodes, setNodes] = useState<any[]>(() => (Array.isArray(initBlock.nodes) ? initBlock.nodes : []));
@@ -6785,6 +6827,43 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (n.shape === "rect") return <rect x={n.x} y={n.y} width={Math.max(1, n.w)} height={Math.max(1, n.h)} rx={12} fill={fill} stroke={stroke} strokeWidth={sw} />;
     if (n.shape === "ellipse") return <ellipse cx={n.x + n.w / 2} cy={n.y + n.h / 2} rx={Math.max(1, n.w / 2)} ry={Math.max(1, n.h / 2)} fill={fill} stroke={stroke} strokeWidth={sw} />;
     if (n.shape === "triangle") return <polygon points={(n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
+    const X = n.x, Y = n.y, W = Math.max(1, n.w), H = Math.max(1, n.h);
+    if (n.shape === "terminal") return <rect x={X} y={Y} width={W} height={H} rx={Math.min(H / 2, W / 2)} fill={fill} stroke={stroke} strokeWidth={sw} />;
+    if (n.shape === "cylinder") { // Banco de dados
+      const ry = Math.min(H * 0.16, W * 0.5);
+      return (<g>
+        <path d={`M ${X} ${Y + ry} A ${W / 2} ${ry} 0 0 1 ${X + W} ${Y + ry} L ${X + W} ${Y + H - ry} A ${W / 2} ${ry} 0 0 1 ${X} ${Y + H - ry} Z`} fill={fill} stroke={stroke} strokeWidth={sw} />
+        <path d={`M ${X} ${Y + ry} A ${W / 2} ${ry} 0 0 0 ${X + W} ${Y + ry}`} fill="none" stroke={stroke} strokeWidth={sw} />
+      </g>);
+    }
+    if (n.shape === "document") { // Documento (base ondulada)
+      const wy = H * 0.14;
+      return <path d={`M ${X} ${Y} L ${X + W} ${Y} L ${X + W} ${Y + H - wy} C ${X + W * 0.72} ${Y + H - wy * 2.6} ${X + W * 0.28} ${Y + H + wy * 1.1} ${X} ${Y + H - wy} Z`} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
+    }
+    if (n.shape === "predefined") { // Processo pré-definido (laterais duplas)
+      const d = W * 0.09;
+      return (<g>
+        <rect x={X} y={Y} width={W} height={H} rx={4} fill={fill} stroke={stroke} strokeWidth={sw} />
+        <line x1={X + d} y1={Y} x2={X + d} y2={Y + H} stroke={stroke} strokeWidth={sw} />
+        <line x1={X + W - d} y1={Y} x2={X + W - d} y2={Y + H} stroke={stroke} strokeWidth={sw} />
+      </g>);
+    }
+    if (n.shape === "stored") { // Dados armazenados (lado esquerdo curvo)
+      const c = W * 0.14;
+      return <path d={`M ${X + c} ${Y} L ${X + W} ${Y} A ${c} ${H / 2} 0 0 1 ${X + W} ${Y + H} L ${X + c} ${Y + H} A ${c} ${H / 2} 0 0 1 ${X + c} ${Y} Z`} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
+    }
+    if (n.shape === "display") { // Display (esquerda curva, direita apontada)
+      const c = W * 0.16;
+      return <path d={`M ${X + c} ${Y} L ${X + W * 0.82} ${Y} L ${X + W} ${Y + H / 2} L ${X + W * 0.82} ${Y + H} L ${X + c} ${Y + H} A ${c} ${H / 2} 0 0 1 ${X + c} ${Y} Z`} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
+    }
+    if (n.shape === "internalstorage") { // Armazenamento interno (linhas internas)
+      const p = Math.min(W, H) * 0.22;
+      return (<g>
+        <rect x={X} y={Y} width={W} height={H} rx={4} fill={fill} stroke={stroke} strokeWidth={sw} />
+        <line x1={X + p} y1={Y} x2={X + p} y2={Y + H} stroke={stroke} strokeWidth={sw} />
+        <line x1={X} y1={Y + p} x2={X + W} y2={Y + p} stroke={stroke} strokeWidth={sw} />
+      </g>);
+    }
     return <polygon points={shapePoints({ kind: n.shape, x: n.x, y: n.y, w: n.w, h: n.h })} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />;
   };
   const renderNode = (n: any) => (
@@ -7157,16 +7236,56 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       {shapePanel && (
         <>
           <div className="absolute inset-0 z-30" onPointerDown={() => setShapePanel(false)} />
-          <div className="bg-card canvas-pill absolute left-16 top-1/2 -translate-y-1/2 z-40 rounded-2xl border border-border/70 shadow-2xl p-2 w-[176px]" onPointerDown={(e) => e.stopPropagation()}>
-            <div className="text-[11px] font-semibold text-muted-foreground mb-1.5 px-0.5">Formas</div>
-            <div className="grid grid-cols-4 gap-1">
+          <div className="bg-card canvas-pill absolute left-16 top-1/2 -translate-y-1/2 z-40 rounded-2xl border border-border/70 shadow-2xl p-1.5 w-[200px] max-h-[74vh] overflow-y-auto" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-1.5 pt-1 pb-1.5">
+              <div className="text-[11px] font-semibold text-muted-foreground">Formas (fluxograma)</div>
+              <button onClick={() => { setShapePanel(false); setHelpOpen(true); }} className="text-[10px] font-medium text-primary hover:underline" type="button">O que é cada uma?</button>
+            </div>
+            <div className="flex flex-col gap-0.5">
               {DIAGRAM_SHAPES.map((s) => (
-                <button key={s.id} onClick={() => { addOrSetShape(s.id); setShapePanel(false); }} className={"w-8 h-8 flex items-center justify-center rounded-lg transition-colors " + (pendingShape === s.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")} title={s.label} type="button"><ShapeIcon kind={s.id} size={16} /></button>
+                <button key={s.id} onClick={() => { addOrSetShape(s.id); setShapePanel(false); }} className={"w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors text-left " + (pendingShape === s.id ? "bg-primary/15 text-primary" : "text-foreground hover:bg-accent")} title={s.label} type="button">
+                  <span className="w-5 flex items-center justify-center shrink-0"><ShapeIcon kind={s.id} size={18} /></span>
+                  <span className="text-[12.5px] font-medium truncate">{s.label}</span>
+                </button>
               ))}
-              <button onClick={() => { addOrSetShape("text"); setShapePanel(false); }} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent text-sm font-bold" title="Texto livre" type="button">T</button>
+              <button onClick={() => { addOrSetShape("text"); setShapePanel(false); }} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-foreground hover:bg-accent transition-colors text-left" title="Texto livre" type="button">
+                <span className="w-5 flex items-center justify-center shrink-0 text-sm font-bold">T</span>
+                <span className="text-[12.5px] font-medium">Texto livre</span>
+              </button>
             </div>
           </div>
         </>
+      )}
+
+      {/* Ajuda: legenda das formas de fluxograma */}
+      {helpOpen && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center p-3 sm:p-6" onPointerDown={() => setHelpOpen(false)}>
+          <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" />
+          <div className="relative bg-card w-full max-w-lg max-h-[86vh] rounded-2xl border border-border/70 shadow-2xl flex flex-col overflow-hidden" onPointerDown={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-border/60">
+              <div>
+                <div className="text-base font-bold text-foreground">Formas de fluxograma</div>
+                <div className="text-[12px] text-muted-foreground mt-0.5">O que cada símbolo costuma representar. Use como guia — o importante é que o seu time entenda.</div>
+              </div>
+              <button onClick={() => setHelpOpen(false)} className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-lg leading-none" title="Fechar" type="button">×</button>
+            </div>
+            <div className="overflow-y-auto px-5 py-3 flex flex-col gap-3">
+              {FLOWCHART_HELP.map((h) => (
+                <div key={h.id} className="flex items-start gap-3">
+                  <span className="shrink-0 mt-0.5 h-10 w-10 rounded-lg border border-border/70 bg-background flex items-center justify-center text-foreground"><ShapeIcon kind={h.id} size={22} /></span>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold text-foreground">{h.label}</div>
+                    <div className="text-[12.5px] leading-[1.5] text-muted-foreground">{h.desc}</div>
+                    {h.ex && <div className="text-[11.5px] leading-[1.45] text-muted-foreground/80 mt-0.5 italic">{h.ex}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t border-border/60 text-[11px] text-muted-foreground">
+              Dica: as formas são um padrão comum, mas você pode adaptá-las ao seu processo. Clareza vale mais que regra.
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Paleta de cores */}
