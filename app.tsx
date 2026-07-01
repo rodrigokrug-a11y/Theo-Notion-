@@ -5443,6 +5443,7 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
   const updateBlocks = (next: any[]) => onUpdate({ content: next });
   const blocks = page.content || [];
   const backlinks = (Array.isArray(pages)?pages:[]).filter((p: any) => p.id !== page.id && !p.deleted_at && pageLinksToId(p, page.id));
+  const subpages = (Array.isArray(pages)?pages:[]).filter((p: any) => p.parent_id === page.id && !p.deleted_at).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
 
   const isCoverColor = page.cover_url?.startsWith("#");
   const hasCover = !!page.cover_url;
@@ -5485,6 +5486,31 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
           style={{ fontSize: "46px", lineHeight: "1.08", minHeight: "58px" }}
         />
         <BlocksEditor blocks={blocks} onChange={updateBlocks} canEdit={canEdit} files={files} pages={pages} onSelectPage={onSelectPage} onCreateEmbed={onCreateEmbed} onCreatePageLink={onCreatePageLink} onUpdatePage={onUpdatePage} />
+
+        {(subpages.length > 0 || canEdit) && (
+          <div className={subpages.length > 0 ? "mt-7" : "mt-7 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity"}>
+            {subpages.length > 0 && (
+              <div className="flex items-center gap-2 px-2 mb-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Subpáginas</span>
+                <span className="text-[10px] text-muted-foreground/50">{subpages.length}</span>
+              </div>
+            )}
+            <div className="space-y-px">
+              {(Array.isArray(subpages)?subpages:[]).map((p: any) => (
+                <button key={p.id} onClick={() => onSelectPage(p.id)} className="w-full flex items-center gap-2.5 px-2 py-1 text-left rounded-md hover:bg-accent/50 transition-colors group" type="button">
+                  <span className="text-[15px] shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">{pageIconNode(p.icon)}</span>
+                  <span className="text-[14px] text-foreground/85 group-hover:text-foreground truncate flex-1 border-b border-transparent group-hover:border-border transition-colors">{p.title || "Sem título"}</span>
+                </button>
+              ))}
+              {canEdit && (
+                <button onClick={() => onCreateSubpage && onCreateSubpage()} className="w-full flex items-center gap-2.5 px-2 py-1 text-left rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent/50 transition-colors" type="button">
+                  <span className="text-[15px] shrink-0 leading-none">+</span>
+                  <span className="text-[13px]">Nova subpágina</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {backlinks.length > 0 && (
           <div className="mt-8 pt-5 border-t border-border/60">
