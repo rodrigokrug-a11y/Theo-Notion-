@@ -9508,6 +9508,12 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   const startHandleDrag = (e: any, block: any, i: number) => {
     if (!canEdit) return;
     e.preventDefault(); e.stopPropagation();
+    const capEl = e.currentTarget; const capId = e.pointerId;
+    // No toque (iPad), captura o ponteiro e trava a rolagem para que o arraste do
+    // bloco funcione (senão a página rola e "nada acontece").
+    try { if (capEl && capEl.setPointerCapture && capId != null) capEl.setPointerCapture(capId); } catch (err) {}
+    const tmPrevent = (ev: any) => { if (ev.cancelable) ev.preventDefault(); };
+    window.addEventListener("touchmove", tmPrevent, { passive: false } as any);
     const ids = (selIds.indexOf(block.id) !== -1 && selIds.length) ? selIds.slice() : [block.id];
     const st: any = dragRef.current = { ids, startX: e.clientX, startY: e.clientY, moved: false };
     const computeDrop = (clientY: number) => {
@@ -9528,6 +9534,7 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
       window.removeEventListener("pointermove", mv);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
+      window.removeEventListener("touchmove", tmPrevent as any);
       setDropIdx(null);
       dragRef.current = null;
     };
@@ -10044,10 +10051,10 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
   };
 
   return (
-    <div ref={rootRef} data-blocks-root onPointerDown={onRootPointerDown} className={"space-y-1 relative " + (xsel ? "dc-xsel" : "")}>
+    <div ref={rootRef} data-blocks-root onPointerDown={onRootPointerDown} className={"space-y-0 relative " + (xsel ? "dc-xsel" : "")}>
       <div ref={overlayRef} aria-hidden="true" className="absolute inset-0 pointer-events-none z-0" />
       {(Array.isArray(list)?list:[]).map((block, i) => (
-        <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0.5 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
+        <div key={block.id} data-blk-row data-blk-id={block.id} id={"blk-" + block.id} onFocusCapture={() => setActiveId(block.id)} className={"group/block relative flex items-start -ml-10 pl-10 pr-2 py-0 rounded-md transition-colors " + (selIds.indexOf(block.id) !== -1 ? "bg-primary/10" : "")}>
           {dropIdx === i && <div contentEditable={false} className="absolute -top-0.5 left-10 right-2 h-0.5 bg-primary rounded-full z-40 pointer-events-none" />}
           {canEdit && !selMode && (
             <div contentEditable={false} className={"absolute left-1.5 top-1.5 transition-opacity flex items-center justify-center select-none z-50 " + (activeId === block.id ? "opacity-100" : "opacity-0 group-hover/block:opacity-100")}>
@@ -10782,13 +10789,13 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
   const ref = useEditable(block, autoFocus, onAutoFocused);
 
   const baseCls: any = {
-    paragraph: "text-[15px] leading-7 text-foreground py-1",
-    h1: "dc-serif text-[34px] font-semibold text-foreground py-2 mt-4",
-    h2: "dc-serif text-[26px] font-semibold text-foreground py-2 mt-3",
-    h3: "dc-serif text-[21px] font-semibold text-foreground py-1.5 mt-2",
-    bullet: "text-[15px] leading-7 text-foreground py-0.5",
-    numbered: "text-[15px] leading-7 text-foreground py-0.5",
-    quote: "text-[15px] leading-7 text-foreground py-1 italic border-l-4 border-primary pl-4 my-1 bg-muted/30 rounded-r-md",
+    paragraph: "text-[15px] leading-[1.5] text-foreground py-[3px]",
+    h1: "dc-serif text-[30px] font-bold text-foreground pt-1 pb-0.5 mt-6",
+    h2: "dc-serif text-[24px] font-bold text-foreground pt-1 pb-0.5 mt-4",
+    h3: "dc-serif text-[19px] font-semibold text-foreground pt-0.5 pb-0.5 mt-3",
+    bullet: "text-[15px] leading-[1.5] text-foreground py-[2px]",
+    numbered: "text-[15px] leading-[1.5] text-foreground py-[2px]",
+    quote: "text-[15px] leading-[1.5] text-foreground py-[3px] italic border-l-[3px] border-primary pl-3 bg-muted/30 rounded-r-md",
   };
   const placeholders: any = {
     paragraph: (listIndex === 0 && allBlocks?.length === 1) ? "Digite '/' para comandos e links, '@' para páginas" : "",
@@ -10858,7 +10865,7 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
     <div key="ce" ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} className={"outline-none break-words " + blockCls + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
   );
 
-  if (block.type === "bullet") return (<div key="li-bullet" className="flex items-start gap-2 group"><span className="text-foreground pt-1.5 select-none leading-none">•</span><div className="flex-1 min-w-0">{inner}</div></div>);
+  if (block.type === "bullet") return (<div key="li-bullet" className="flex items-start gap-2.5 group"><span className="shrink-0 rounded-full bg-foreground select-none" style={{ width: "6px", height: "6px", marginTop: "8px" }} /><div className="flex-1 min-w-0">{inner}</div></div>);
   if (block.type === "numbered") {
     let n = 1;
     if (Array.isArray(allBlocks) && typeof listIndex === "number") {
@@ -10867,7 +10874,7 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
         else if ((allBlocks[i]?.indent || 0) < (block.indent || 0)) break;
       }
     }
-    return (<div key="li-numbered" className="flex items-start gap-2 group"><span className="text-foreground pt-1 select-none text-[15px] tabular-nums">{n}.</span><div className="flex-1 min-w-0">{inner}</div></div>);
+    return (<div key="li-numbered" className="flex items-start gap-2 group"><span className="text-foreground select-none text-[15px] tabular-nums leading-none" style={{ paddingTop: "6px" }}>{n}.</span><div className="flex-1 min-w-0">{inner}</div></div>);
   }
   return inner;
 }
