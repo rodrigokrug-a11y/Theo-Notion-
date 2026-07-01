@@ -5568,6 +5568,9 @@ function PageEditor({ page, pages, canEdit, files, onUpdate, showIconPicker, set
 function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showIconPicker, setShowIconPicker, embedHeight }: any) {
   const initBlock = (Array.isArray(page.content) && page.content[0]) || { id: uid(), type: "diagram", nodes: [], edges: [] };
   const blockIdRef = useRef(initBlock.id || uid());
+  const [dgBg, setDgBg] = useState<any>(() => (initBlock.bg && typeof initBlock.bg === "object") ? initBlock.bg : { color: "", pattern: "dots" });
+  const dgBgRef = useRef(dgBg); dgBgRef.current = dgBg;
+  const [bgMenu, setBgMenu] = useState(false);
 
   const [title, setTitle] = useState(page.title || "");
   const [nodes, setNodes] = useState<any[]>(() => (Array.isArray(initBlock.nodes) ? initBlock.nodes : []));
@@ -5629,7 +5632,8 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
 
   useEffect(() => { editRef.current = editing; }, [editing]);
 
-  const persist = (ns: any[], es: any[]) => onUpdate({ content: [{ id: blockIdRef.current, type: "diagram", nodes: ns, edges: es }] });
+  const persist = (ns: any[], es: any[]) => onUpdate({ content: [{ id: blockIdRef.current, type: "diagram", nodes: ns, edges: es, bg: dgBgRef.current }] });
+  const changeBg = (patch: any) => { const nb = { ...dgBgRef.current, ...patch }; dgBgRef.current = nb; setDgBg(nb); persist(nodesRef.current, edgesRef.current); };
   const snap = () => ({ nodes: nodesRef.current, edges: edgesRef.current });
   const setData = (ns: any[], es: any[]) => { nodesRef.current = ns; edgesRef.current = es; setNodes(ns); setEdges(es); };
 
@@ -6848,7 +6852,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
-        style={{ touchAction: "none", cursor: drawShape ? "crosshair" : effTool === "pan" ? "grab" : "default", backgroundColor: "hsl(var(--background))" }}
+        style={{ touchAction: "none", cursor: drawShape ? "crosshair" : effTool === "pan" ? "grab" : "default", backgroundColor: dgBg.color || "hsl(var(--background))" }}
         onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
         onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
         onPointerDown={onPointerDown}
@@ -6859,11 +6863,14 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       >
         <defs>
           <pattern id="diagram-dots" width="28" height="28" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.4" fill="hsl(var(--muted-foreground))" fillOpacity={0.25} />
+            <circle cx="2" cy="2" r="1.4" fill="hsl(var(--muted-foreground))" fillOpacity={0.28} />
+          </pattern>
+          <pattern id="diagram-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+            <path d="M28 0H0V28" fill="none" stroke="hsl(var(--muted-foreground))" strokeOpacity={0.18} strokeWidth={1} />
           </pattern>
         </defs>
         <g transform={"translate(" + tx + " " + ty + ") scale(" + scale + ")"}>
-          <rect x={-100000} y={-100000} width={200000} height={200000} fill="url(#diagram-dots)" />
+          {dgBg.pattern !== "none" && <rect x={-100000} y={-100000} width={200000} height={200000} fill={"url(#diagram-" + (dgBg.pattern === "grid" ? "grid" : "dots") + ")"} />}
           {(Array.isArray(edges) ? edges : []).map(renderEdge)}
           {(Array.isArray(nodes) ? nodes : []).map(renderNode)}
           {edgeDraft && (() => {
@@ -7043,6 +7050,28 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         <div className="w-px h-5 bg-border mx-0.5 shrink-0 hidden sm:block" />
         {canEdit && (
           <button onClick={() => { if (orgOpen) setOrgOpen(false); else openOrgPanel(); }} className={"h-8 px-2 shrink-0 flex items-center justify-center gap-1 rounded-xl transition-colors text-[11px] font-semibold " + (orgOpen ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")} title="Organograma a partir de texto (cria e edita)" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8.5" y="3.5" width="7" height="5" rx="1.2" /><rect x="3" y="15.5" width="6.5" height="5" rx="1.2" /><rect x="14.5" y="15.5" width="6.5" height="5" rx="1.2" /><path d="M12 8.5v3.5M6.2 15.5V12.5h11.6v3" /></svg><span className="hidden lg:inline">Organograma</span></button>
+        )}
+        {canEdit && (
+          <div className="relative shrink-0">
+            <button onClick={() => setBgMenu((v) => !v)} className={"h-8 px-2 flex items-center justify-center gap-1 rounded-xl transition-colors text-[11px] font-semibold " + (bgMenu ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground")} title="Fundo do diagrama" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m9 17 6.1-6.1a2 2 0 0 1 2.81.01L22 15" /><circle cx="8" cy="9" r="2" /><rect x="2" y="3" width="20" height="14" rx="2" /></svg><span className="hidden lg:inline">Fundo</span></button>
+            {bgMenu && (<>
+              <div className="fixed inset-0 z-40" onPointerDown={() => setBgMenu(false)} />
+              <div className="bg-card canvas-pill absolute right-0 top-full mt-1 z-50 rounded-2xl border border-border/70 shadow-2xl p-3 w-56" style={{ backgroundColor: "hsl(var(--card))" }} onPointerDown={(e) => e.stopPropagation()}>
+                <div className="text-[11px] font-semibold text-muted-foreground mb-1.5">Cor</div>
+                <div className="grid grid-cols-6 gap-1.5 mb-3">
+                  {["", "#ffffff", "#f8fafc", "#fef9c3", "#dcfce7", "#dbeafe", "#f3e8ff", "#fee2e2", "#ffedd5", "#e2e8f0", "#0f172a", "#1e293b"].map((c) => (
+                    <button key={c || "def"} onClick={() => changeBg({ color: c })} className={"h-6 w-6 rounded-lg border flex items-center justify-center transition-transform hover:scale-110 " + ((dgBg.color || "") === c ? "ring-2 ring-primary" : "border-border/60")} style={{ background: c || "hsl(var(--background))" }} title={c || "Padrão"} type="button">{!c && <span className="text-[9px] text-muted-foreground">A</span>}</button>
+                  ))}
+                </div>
+                <div className="text-[11px] font-semibold text-muted-foreground mb-1.5">Padrão</div>
+                <div className="flex gap-1.5">
+                  {[["dots", "Pontos"], ["grid", "Grade"], ["none", "Liso"]].map(([v, l]) => (
+                    <button key={v} onClick={() => changeBg({ pattern: v })} className={"flex-1 h-8 rounded-lg text-[11px] font-medium border transition-colors " + (dgBg.pattern === v ? "bg-primary/15 text-primary border-primary/40" : "border-border/60 text-foreground hover:bg-accent")} type="button">{l}</button>
+                  ))}
+                </div>
+              </div>
+            </>)}
+          </div>
         )}
         {canEdit && (
           <button onClick={() => { if (dgFileRef.current) dgFileRef.current.click(); }} className="h-8 px-2 shrink-0 flex items-center justify-center gap-1 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-[11px] font-semibold" title="Importar imagens ou PDF para o diagrama" type="button">📥<span className="hidden lg:inline">Importar</span></button>
