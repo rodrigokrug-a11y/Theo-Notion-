@@ -6239,14 +6239,17 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     lines.forEach((ln, i) => { t += '<tspan x="' + cx + '" dy="' + (i === 0 ? 0 : lh) + '">' + xmlEsc(ln) + '</tspan>'; });
     return t + '</text>';
   };
-  const nodeToSvgString = (n: any) => {
+  const nodeToSvgString = (n: any, imgMap?: any) => {
+    const rot = n.rot || 0;
+    const wrapRot = (body: string) => rot ? '<g transform="rotate(' + rot + ' ' + (n.x + n.w / 2) + ' ' + (n.y + n.h / 2) + ')">' + body + '</g>' : body;
     const fill = n.bg && n.bg !== "transparent" ? n.bg : "none";
     const stroke = n.color && n.color !== "transparent" ? n.color : "none";
     const sw = 2;
     if (n.shape === "image") {
-      let out = '<image xlink:href="' + n.src + '" href="' + n.src + '" x="' + n.x + '" y="' + n.y + '" width="' + Math.max(1, n.w) + '" height="' + Math.max(1, n.h) + '" preserveAspectRatio="xMidYMid meet"/>';
+      const src = (imgMap && imgMap[n.src]) || n.src;
+      let out = '<image xlink:href="' + xmlEsc(src) + '" href="' + xmlEsc(src) + '" x="' + n.x + '" y="' + n.y + '" width="' + Math.max(1, n.w) + '" height="' + Math.max(1, n.h) + '" preserveAspectRatio="xMidYMid meet"/>';
       if (stroke !== "none") out += '<rect x="' + n.x + '" y="' + n.y + '" width="' + Math.max(1, n.w) + '" height="' + Math.max(1, n.h) + '" rx="6" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
-      return out;
+      return wrapRot(out);
     }
     if (DIAGRAM_LINE_SHAPES.indexOf(n.shape) !== -1) {
       const c = n.color && n.color !== "transparent" ? n.color : "#334155";
@@ -6262,7 +6265,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     else if (n.shape === "ellipse") sh = '<ellipse cx="' + (n.x + n.w / 2) + '" cy="' + (n.y + n.h / 2) + '" rx="' + Math.max(1, n.w / 2) + '" ry="' + Math.max(1, n.h / 2) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
     else if (n.shape === "triangle") sh = '<polygon points="' + ((n.x + n.w / 2) + "," + n.y + " " + n.x + "," + (n.y + n.h) + " " + (n.x + n.w) + "," + (n.y + n.h)) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
     else if (n.shape !== "text") sh = '<polygon points="' + shapePoints({ kind: n.shape, x: n.x, y: n.y, w: n.w, h: n.h }) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
-    return sh + nodeTextSvg(n);
+    return wrapRot(sh + nodeTextSvg(n));
   };
   const edgeToSvgString = (ed: any) => {
     const g = edgeGeom(ed);
@@ -6285,7 +6288,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     if (ed.label) { out += '<text x="' + labelMid.x + '" y="' + labelMid.y + '" font-size="12" fill="#0f172a" font-family="ui-sans-serif,system-ui,sans-serif" text-anchor="middle" dominant-baseline="middle">' + xmlEsc(ed.label) + '</text>'; }
     return out;
   };
-  const buildDiagramSvg = () => {
+  const buildDiagramSvg = (imgMap?: any) => {
     const ns = nodesRef.current, es = edgesRef.current;
     if (!ns.length) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -6293,53 +6296,73 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
     es.forEach((ed: any) => { const g = edgeGeom(ed); if (g) { [g.p1, g.p2, g.cp].forEach((pt: any) => { if (pt) { minX = Math.min(minX, pt.x); minY = Math.min(minY, pt.y); maxX = Math.max(maxX, pt.x); maxY = Math.max(maxY, pt.y); } }); } });
     const pad = 48;
     const vbx = minX - pad, vby = minY - pad, vbw = (maxX - minX) + pad * 2, vbh = (maxY - minY) + pad * 2;
-    const inner = es.map(edgeToSvgString).join("") + ns.map(nodeToSvgString).join("");
+    const inner = es.map(edgeToSvgString).join("") + ns.map((n: any) => nodeToSvgString(n, imgMap)).join("");
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + vbw + '" height="' + vbh + '" viewBox="' + vbx + ' ' + vby + ' ' + vbw + ' ' + vbh + '"><rect x="' + vbx + '" y="' + vby + '" width="' + vbw + '" height="' + vbh + '" fill="#ffffff"/>' + inner + '</svg>';
     return { svg, vbw, vbh };
   };
-  const exportDiagram = (format: string) => {
+  // Converte uma imagem (URL externa) em data URI. Imagens externas dentro do
+  // SVG "sujam" o canvas e travam a exportação; embutir como data URI resolve.
+  const srcToDataUrl = (src: string) => new Promise<string>((resolve) => {
+    if (!src || src.indexOf("data:") === 0) { resolve(src); return; }
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => {
+      try {
+        const tc = document.createElement("canvas");
+        tc.width = im.naturalWidth || im.width || 1;
+        tc.height = im.naturalHeight || im.height || 1;
+        const tx = tc.getContext("2d");
+        if (!tx) { resolve(src); return; }
+        tx.drawImage(im, 0, 0);
+        resolve(tc.toDataURL("image/png"));
+      } catch (e) { resolve(src); } // CORS bloqueou a leitura → mantém o original
+    };
+    im.onerror = () => resolve(src);
+    im.src = src;
+  });
+  const loadSvgImage = (svg: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+    const im = new Image();
+    im.onload = () => { resolve(im); setTimeout(() => URL.revokeObjectURL(url), 2000); };
+    im.onerror = () => { URL.revokeObjectURL(url); reject(new Error("SVG inválido")); };
+    im.src = url;
+  });
+  const canvasToBlob = (c: HTMLCanvasElement, type: string, q?: number) => new Promise<Blob | null>((resolve) => {
+    try { c.toBlob((b) => resolve(b), type, q); } catch (e) { resolve(null); } // canvas sujo → null
+  });
+  const exportDiagram = async (format: string) => {
     setExportMenu(false);
     try {
-      const built = buildDiagramSvg();
+      if (!nodesRef.current.length) { toast("Diagrama vazio — nada para exportar", "error"); return; }
+      // Embute imagens externas como data URI (evita canvas "sujo").
+      const imgMap: any = {};
+      const srcs = Array.from(new Set(nodesRef.current.filter((n: any) => n.shape === "image" && n.src).map((n: any) => n.src)));
+      if (srcs.length) { await Promise.all(srcs.map(async (s: any) => { imgMap[s] = await srcToDataUrl(s); })); }
+      const built = buildDiagramSvg(imgMap);
       if (!built) { toast("Diagrama vazio — nada para exportar", "error"); return; }
       const vbw = built.vbw, vbh = built.vbh;
-      const img = new Image();
-      const url = URL.createObjectURL(new Blob([built.svg], { type: "image/svg+xml;charset=utf-8" }));
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        const sc = Math.max(1, Math.min(3, 6000 / Math.max(vbw, vbh, 1)));
-        c.width = Math.max(1, Math.round(vbw * sc));
-        c.height = Math.max(1, Math.round(vbh * sc));
-        const ctx = c.getContext("2d");
-        if (!ctx) { URL.revokeObjectURL(url); return; }
-        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
-        ctx.drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        const name = (title || page.title || "diagrama").replace(/\s+/g, "_");
-        if (format === "pdf") {
-          c.toBlob(async (blob) => {
-            if (!blob) { toast("Falha ao exportar", "error"); return; }
-            const bytes = new Uint8Array(await blob.arrayBuffer());
-            const pdf = buildPdfFromJpeg(bytes, c.width, c.height);
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(pdf); a.download = name + ".pdf"; a.click();
-            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-            toast("PDF exportado!", "success");
-          }, "image/jpeg", 0.92);
-        } else {
-          c.toBlob((blob) => {
-            if (!blob) { toast("Falha ao exportar", "error"); return; }
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob); a.download = name + ".png"; a.click();
-            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-            toast("PNG exportado!", "success");
-          }, "image/png");
-        }
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); toast("Falha ao exportar", "error"); };
-      img.src = url;
+      const img = await loadSvgImage(built.svg);
+      const c = document.createElement("canvas");
+      const sc = Math.max(1, Math.min(3, 6000 / Math.max(vbw, vbh, 1)));
+      c.width = Math.max(1, Math.round(vbw * sc));
+      c.height = Math.max(1, Math.round(vbh * sc));
+      const ctx = c.getContext("2d");
+      if (!ctx) { toast("Falha ao exportar", "error"); return; }
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const name = (title || page.title || "diagrama").replace(/\s+/g, "_");
+      const raw = format === "pdf" ? await canvasToBlob(c, "image/jpeg", 0.92) : await canvasToBlob(c, "image/png");
+      if (!raw) { toast("Não foi possível gerar o arquivo (imagem externa bloqueada). Tente remover imagens importadas.", "error"); return; }
+      let outBlob: Blob = raw, ext = "png";
+      if (format === "pdf") { const bytes = new Uint8Array(await raw.arrayBuffer()); outBlob = buildPdfFromJpeg(bytes, c.width, c.height); ext = "pdf"; }
+      const href = URL.createObjectURL(outBlob);
+      const a = document.createElement("a");
+      a.href = href; a.download = name + "." + ext; a.rel = "noopener";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 3000);
+      toast(format === "pdf" ? "PDF exportado!" : "PNG exportado!", "success");
     } catch (e: any) {
-      toast("Não foi possível exportar", "error");
+      toast("Não foi possível exportar" + (e && e.message ? " (" + e.message + ")" : ""), "error");
     }
   };
 
