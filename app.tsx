@@ -51,6 +51,9 @@ export default function MyApp(props: any) {
 
 const HASH = "mqo532";
 const TBL = "app_notion_pages_mqo532";
+// Marcador de versão visível (canto da barra lateral). Serve para confirmar
+// qual build está rodando de fato no theo. Mude a cada alteração.
+const APP_BUILD = "build TUCANO-9";
 
 // Tamanho de fonte por bloco (em pontos). Usado no menu do bloco (⠿).
 const BLOCK_DEFAULT_PT: any = { h1: 21, h2: 16, h3: 14, paragraph: 11, bullet: 11, numbered: 11, quote: 11, todo: 11, callout: 11, toggle: 11 };
@@ -5345,6 +5348,7 @@ function Sidebar({ pages, activeId, expanded, setExpanded, onSelect, onCreate, o
           <span className="flex-1">Lixeira</span>
           {trashCount > 0 && (<span className="text-[11px] font-semibold text-muted-foreground bg-muted rounded-full px-1.5 py-px">{trashCount}</span>)}
         </button>
+        <div className="px-2 pt-1.5 text-[10px] text-muted-foreground/60 font-mono select-text">{APP_BUILD}</div>
       </div>
     </aside>
   );
