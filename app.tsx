@@ -4499,6 +4499,9 @@ function AppContent({ db, user, files }: any) {
   const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [moveTarget, setMoveTarget] = useState<any>(null);
+  const [shareImportOpen, setShareImportOpen] = useState(false);
+  const [shareImportText, setShareImportText] = useState("");
+  const [shareBusy, setShareBusy] = useState(false);
   const canEdit = user.role === "admin" || user.role === "builder";
 
   const pendingChanges = useRef<Record<string, any>>({});
@@ -4537,6 +4540,20 @@ function AppContent({ db, user, files }: any) {
     setPages(parsed);
     return parsed;
   };
+
+  // Ao abrir um link de compartilhamento (…#p=<id>), oferece copiar o documento.
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      const h = typeof location !== "undefined" ? location.hash : "";
+      const m = h.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+      if (m) {
+        setShareImportText(m[0]);
+        setShareImportOpen(true);
+        try { if (typeof history !== "undefined") history.replaceState(null, "", location.href.split("#")[0]); } catch (e) {}
+      }
+    } catch (e) {}
+  }, [ready]);
 
   const createPage = async (parentId: string | null, kind: "doc" | "canvas" | "diagram" = "doc") => {
     if (!canEdit) return;
@@ -4647,6 +4664,75 @@ function AppContent({ db, user, files }: any) {
     } catch (e: any) {
       toast("Erro ao duplicar: " + e.message, "error");
     }
+  };
+
+  // --- Compartilhar por link + copiar um documento compartilhado ---------
+  const extractShareId = (s: string) => {
+    const m = String(s || "").match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    return m ? m[0] : null;
+  };
+  const copyShareLink = async (id: string) => {
+    const base = typeof location !== "undefined" ? location.href.split("#")[0] : "";
+    const link = base + "#p=" + id;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Link copiado! Quem receber pode fazer uma cópia no próprio espaço.", "success");
+    } catch (e) {
+      try { window.prompt("Copie o link de compartilhamento:", link); } catch (e2) {}
+    }
+  };
+  // Busca a página compartilhada + suas subpáginas (de qualquer dono) pelo id.
+  const fetchSharedSubtree = async (rootId: string) => {
+    const rootRows = parseRows(await db.query("SELECT * FROM " + TBL + " WHERE id = $1 AND deleted_at IS NULL", [rootId]));
+    if (!rootRows.length) return null;
+    const all: any[] = [rootRows[0]];
+    let frontier: string[] = [rootId];
+    let guard = 0;
+    while (frontier.length && guard < 5000) {
+      const kids = parseRows(await db.query("SELECT * FROM " + TBL + " WHERE parent_id = ANY($1::uuid[]) AND deleted_at IS NULL", [frontier]));
+      if (!kids.length) break;
+      all.push(...kids);
+      frontier = kids.map((k: any) => k.id);
+      guard += kids.length;
+    }
+    return all;
+  };
+  const copySharedDoc = async (rootId: string) => {
+    if (!canEdit) { toast("Você precisa de permissão de edição para copiar", "error"); return false; }
+    if (!rootId) { toast("Link inválido — não encontrei o documento", "error"); return false; }
+    try {
+      const subtree = await fetchSharedSubtree(rootId);
+      if (!subtree || !subtree.length) { toast("Documento não encontrado — o link pode estar errado ou o item foi removido", "error"); return false; }
+      const byId = new Map(subtree.map((p: any) => [p.id, p]));
+      const childrenOf = (pid: string) => subtree.filter((p: any) => p.parent_id === pid).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
+      const created: any[] = [];
+      const cloneRec = async (origId: string, newParentId: string | null, suffix: string): Promise<any> => {
+        const o = byId.get(origId);
+        if (!o) return null;
+        const sibCount = (Array.isArray(pages) ? pages : []).filter((p: any) => p.parent_id === newParentId && !p.deleted_at).length + created.filter((p) => p.parent_id === newParentId).length;
+        const r = await db.query<any>("INSERT INTO " + TBL + " (owner_id, parent_id, title, icon, cover_url, content, sort_order) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7) RETURNING *", [user.id, newParentId, (o.title || "Sem título") + suffix, o.icon || "ic:file-text", o.cover_url || null, JSON.stringify(o.content || []), sibCount]);
+        const np = parseRows(r)[0];
+        created.push(np);
+        for (const k of childrenOf(origId)) await cloneRec(k.id, np.id, "");
+        return np;
+      };
+      const root = await cloneRec(rootId, null, " (cópia)");
+      setPages((prev: any) => [...(Array.isArray(prev) ? prev : []), ...created]);
+      if (root) { setActiveId(root.id); setView("page"); closeSidebarOnMobile(); }
+      toast(created.length > 1 ? "Documento e " + (created.length - 1) + " subpágina(s) copiados para o seu espaço" : "Documento copiado para o seu espaço", "success");
+      return true;
+    } catch (e: any) {
+      toast("Não consegui copiar: " + (e && e.message ? e.message : "erro"), "error");
+      return false;
+    }
+  };
+  const runShareImport = async () => {
+    const id = extractShareId(shareImportText);
+    if (!id) { toast("Não encontrei um link/documento válido — cole o link completo", "error"); return; }
+    setShareBusy(true);
+    const ok = await copySharedDoc(id);
+    setShareBusy(false);
+    if (ok) { setShareImportOpen(false); setShareImportText(""); }
   };
 
   const flushSavesNow = async () => {
@@ -4807,6 +4893,8 @@ function AppContent({ db, user, files }: any) {
             { label: "Novo caderno (subpágina)", icon: <span className="text-sm">✏️</span>, onClick: () => createPage(activePage.id, "canvas") },
             { label: "Novo diagrama (subpágina)", icon: <span className="text-sm">🗺️</span>, onClick: () => createPage(activePage.id, "diagram") },
             { label: "Duplicar página", icon: <span className="text-sm">⧉</span>, onClick: () => duplicatePage(activePage.id), divider: true },
+            { label: "Copiar link de compartilhamento", icon: <span className="text-sm">🔗</span>, onClick: () => copyShareLink(activePage.id) },
+            { label: "Copiar de um link…", icon: <span className="text-sm">📥</span>, onClick: () => { setShareImportText(""); setShareImportOpen(true); } },
             { label: "Mover para...", icon: <span className="text-sm">📁</span>, onClick: () => setMoveTarget(activePage) },
             { label: "Excluir página", icon: <span className="text-sm">🗑️</span>, onClick: () => { if (confirm("Mover \"" + (activePage.title || "Sem título") + "\" e suas subpáginas para a lixeira?")) softDelete(activePage.id); }, divider: true },
           ]}
@@ -4958,6 +5046,25 @@ function AppContent({ db, user, files }: any) {
       </div>
       {searchOpen && (<CommandPalette pages={pages} onClose={() => setSearchOpen(false)} onSelect={(id: string) => { setActiveId(id); setView("page"); setSearchOpen(false); }} />)}
       {moveTarget && (<MoveDialog page={moveTarget} pages={pages} onClose={() => setMoveTarget(null)} onMove={(parentId: string | null) => { movePage(moveTarget.id, parentId); setMoveTarget(null); }} />)}
+      {shareImportOpen && (
+        <CustomDialog open={true} onClose={() => { if (!shareBusy) { setShareImportOpen(false); } }} title="Copiar um documento compartilhado">
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">Cole o link que você recebeu. Uma cópia <span className="font-semibold text-foreground">editável</span> será criada no seu espaço, incluindo as subpáginas.</p>
+            <input
+              autoFocus
+              value={shareImportText}
+              onChange={(e) => setShareImportText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !shareBusy) { e.preventDefault(); runShareImport(); } }}
+              placeholder="Cole o link aqui (termina em #p=…)"
+              className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button onClick={() => setShareImportOpen(false)} disabled={shareBusy} className="h-9 px-4 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50" type="button">Cancelar</button>
+              <button onClick={runShareImport} disabled={shareBusy || !shareImportText.trim()} className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50" type="button">{shareBusy ? "Copiando..." : "Fazer uma cópia"}</button>
+            </div>
+          </div>
+        </CustomDialog>
+      )}
       {canEdit && <FormatToolbar />}
     </div>
   );
