@@ -6051,6 +6051,9 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   };
 
   // Copiar / colar / recortar (Ctrl+C / Ctrl+V / Ctrl+X) — 1 ou vários
+  // Coordena Ctrl+V entre o keydown (cola nós internos) e o evento "paste"
+  // (cola imagem do clipboard). A imagem tem prioridade e cancela a pendência.
+  const pendingNodePasteRef = useRef(false);
   const copyDiagram = () => {
     const ids = selectedNodeIds();
     if (!ids.length) return false;
@@ -6414,6 +6417,7 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       // (1) Bitmap direto no clipboard
       const imgItem = items.find((it: any) => it.type && it.type.indexOf("image/") === 0);
       if (imgItem) {
+        pendingNodePasteRef.current = false; // imagem tem prioridade sobre nó copiado
         e.preventDefault();
         const file = imgItem.getAsFile(); if (!file) return;
         try {
@@ -6433,15 +6437,23 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
         const tt = text.trim();
         if (/^data:image\//i.test(tt) || /^https?:\/\/\S+\.(png|jpe?g|gif|webp|bmp|svg)(\?\S*)?$/i.test(tt)) url = tt;
       }
-      if (!url) return;
-      e.preventDefault();
-      try {
-        const dim = await imageDims(url);
-        const inlined = await srcToDataUrl(url); // tenta embutir p/ exibir e exportar bem
-        addImageNodes([{ src: inlined || url, iw: dim.w, ih: dim.h }]);
-        toast("Imagem colada no diagrama", "success");
-      } catch (err) {
-        toast("Não consegui carregar essa imagem (o site pode bloquear).", "error");
+      if (url) {
+        pendingNodePasteRef.current = false; // imagem tem prioridade sobre nó copiado
+        e.preventDefault();
+        try {
+          const dim = await imageDims(url);
+          const inlined = await srcToDataUrl(url); // tenta embutir p/ exibir e exportar bem
+          addImageNodes([{ src: inlined || url, iw: dim.w, ih: dim.h }]);
+          toast("Imagem colada no diagrama", "success");
+        } catch (err) {
+          toast("Não consegui carregar essa imagem (o site pode bloquear).", "error");
+        }
+        return;
+      }
+      // Sem imagem no clipboard → cola os nós copiados (se o evento "paste" disparar,
+      // trata aqui e cancela a pendência do timer para não colar duas vezes).
+      if (pendingNodePasteRef.current && DIAGRAM_CLIP && DIAGRAM_CLIP.length) {
+        pendingNodePasteRef.current = false; e.preventDefault(); pasteDiagram();
       }
     };
     window.addEventListener("paste", onPaste);
@@ -6461,7 +6473,18 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
       if (meta && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
       if (meta && e.key.toLowerCase() === "c") { if (copyDiagram()) e.preventDefault(); return; }
       if (meta && e.key.toLowerCase() === "x") { if (copyDiagram()) { e.preventDefault(); deleteSelected(); } return; }
-      if (meta && e.key.toLowerCase() === "v") { if (pasteDiagram()) e.preventDefault(); return; }
+      // Ctrl+V: se há nós copiados, agenda a colagem deles — mas SEM preventDefault,
+      // para o evento "paste" ainda poder disparar. Se o clipboard tiver uma imagem,
+      // o handler de "paste" cancela esta pendência e cola a imagem (imagem tem
+      // prioridade). O timer cobre o caso em que "paste" nem dispara (clipboard do
+      // sistema vazio, já que a cópia de nós é interna e não mexe no clipboard do SO).
+      if (meta && e.key.toLowerCase() === "v") {
+        if (DIAGRAM_CLIP && DIAGRAM_CLIP.length) {
+          pendingNodePasteRef.current = true;
+          setTimeout(() => { if (pendingNodePasteRef.current) { pendingNodePasteRef.current = false; pasteDiagram(); } }, 130);
+        }
+        return;
+      }
       if (meta && e.key.toLowerCase() === "g" && !e.shiftKey) { e.preventDefault(); groupSelected(); return; }
       if (meta && (e.key.toLowerCase() === "g" && e.shiftKey)) { e.preventDefault(); ungroupSelected(); return; }
       if ((e.key === "Delete" || e.key === "Backspace") && (selected || multiSel.length)) { e.preventDefault(); deleteSelected(); return; }
