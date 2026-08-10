@@ -53,7 +53,7 @@ const HASH = "mqo532";
 const TBL = "app_notion_pages_mqo532";
 // Marcador de versão visível (canto da barra lateral). Serve para confirmar
 // qual build está rodando de fato no theo. Mude a cada alteração.
-const APP_BUILD = "build TUCANO-9";
+const APP_BUILD = "build TUCANO-10";
 
 // Tamanho de fonte por bloco (em pontos). Usado no menu do bloco (⠿).
 const BLOCK_DEFAULT_PT: any = { h1: 21, h2: 16, h3: 14, paragraph: 11, bullet: 11, numbered: 11, quote: 11, todo: 11, callout: 11, toggle: 11 };
@@ -4510,6 +4510,7 @@ function AppContent({ db, user, files }: any) {
   const [shareImportOpen, setShareImportOpen] = useState(false);
   const [shareImportText, setShareImportText] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
+  const [sharedDoc, setSharedDoc] = useState<any>(null); // documento aberto por link (somente leitura)
   const canEdit = user.role === "admin" || user.role === "builder";
 
   const pendingChanges = useRef<Record<string, any>>({});
@@ -4549,17 +4550,25 @@ function AppContent({ db, user, files }: any) {
     return parsed;
   };
 
-  // Ao abrir um link de compartilhamento (…#p=<id>), oferece copiar o documento.
+  // Ao abrir um link de compartilhamento (…#p=<id>): abre o documento em modo
+  // somente leitura, com um botão "Fazer uma cópia" no topo.
   useEffect(() => {
     if (!ready) return;
     try {
       const h = typeof location !== "undefined" ? location.hash : "";
       const m = h.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-      if (m) {
-        setShareImportText(m[0]);
-        setShareImportOpen(true);
-        try { if (typeof history !== "undefined") history.replaceState(null, "", location.href.split("#")[0]); } catch (e) {}
-      }
+      if (!m) return;
+      const id = m[0];
+      try { if (typeof history !== "undefined") history.replaceState(null, "", location.href.split("#")[0]); } catch (e) {}
+      const own = (Array.isArray(pages) ? pages : []).find((p: any) => p.id === id && !p.deleted_at);
+      if (own) { setActiveId(id); setView("page"); return; } // é meu → só abre
+      (async () => {
+        try {
+          const rows = parseRows(await db.query("SELECT * FROM " + TBL + " WHERE id = $1 AND deleted_at IS NULL", [id]));
+          if (rows.length) { setSharedDoc(rows[0]); setView("page"); }
+          else toast("Documento não encontrado — o link pode estar errado ou o item foi removido", "error");
+        } catch (e: any) { toast("Não consegui abrir o documento compartilhado", "error"); }
+      })();
     } catch (e) {}
   }, [ready]);
 
@@ -4984,6 +4993,8 @@ function AppContent({ db, user, files }: any) {
                   <span className="shrink-0 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] uppercase font-bold tracking-wider">🗺️ Diagrama</span>
                 )}
               </>
+            ) : sharedDoc ? (
+              <span className="flex-1 text-sm text-muted-foreground truncate">🔗 Documento compartilhado</span>
             ) : (
               <span className="flex-1 text-sm text-muted-foreground">Página inicial</span>
             )}
@@ -4992,7 +5003,24 @@ function AppContent({ db, user, files }: any) {
         </header>
         )}
         <main className="flex-1 overflow-y-auto">
-          {view === "trash" ? (
+          {sharedDoc ? (
+            <div className="min-h-full">
+              <div className="sticky top-0 z-20 flex items-center justify-between gap-3 flex-wrap px-4 py-2.5 border-b border-primary/25" style={{ backgroundColor: "hsl(var(--primary) / 0.10)" }}>
+                <div className="text-sm text-foreground flex items-center gap-2 min-w-0"><span>🔗</span><span className="truncate"><span className="font-semibold">Documento compartilhado</span> <span className="text-muted-foreground">— somente leitura</span></span></div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => setSharedDoc(null)} className="h-8 px-3 rounded-md text-sm text-muted-foreground hover:bg-accent transition-colors" type="button">Fechar</button>
+                  <button onClick={async () => { const ok = await copySharedDoc(sharedDoc.id); if (ok) setSharedDoc(null); }} disabled={!canEdit} title={canEdit ? "" : "Você precisa de permissão de edição"} className="h-8 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity inline-flex items-center gap-1.5 disabled:opacity-50" type="button"><span>⧉</span>Fazer uma cópia para editar</button>
+                </div>
+              </div>
+              {isCanvasPage(sharedDoc) ? (
+                <CanvasEditor key={"sh-" + sharedDoc.id} page={sharedDoc} canEdit={false} onUpdate={() => {}} onImportPages={() => {}} headerLeft={null} headerRight={null} showIconPicker={false} setShowIconPicker={() => {}} />
+              ) : isDiagramPage(sharedDoc) ? (
+                <DiagramEditor key={"sh-" + sharedDoc.id} page={sharedDoc} canEdit={false} onUpdate={() => {}} headerLeft={null} headerRight={null} showIconPicker={false} setShowIconPicker={() => {}} />
+              ) : (
+                <PageEditor key={"sh-" + sharedDoc.id} page={sharedDoc} pages={[]} canEdit={false} files={files} onUpdate={() => {}} showIconPicker={false} setShowIconPicker={() => {}} showCoverPicker={false} setShowCoverPicker={() => {}} showColorPicker={false} setShowColorPicker={() => {}} onSelectPage={() => {}} onCreateSubpage={() => {}} onCreateEmbed={() => {}} onCreatePageLink={() => {}} onUpdatePage={() => {}} />
+              )}
+            </div>
+          ) : view === "trash" ? (
             <TrashView pages={pages} onRestore={restore} onHardDelete={hardDelete} onEmpty={emptyTrash} />
           ) : activePage ? (
             isCanvasPage(activePage) ? (
