@@ -52,6 +52,11 @@ export default function MyApp(props: any) {
 const HASH = "mqo532";
 const TBL = "app_notion_pages_mqo532";
 
+// Tamanho de fonte por bloco (em pontos). Usado no menu do bloco (⠿).
+const BLOCK_DEFAULT_PT: any = { h1: 21, h2: 16, h3: 14, paragraph: 11, bullet: 11, numbered: 11, quote: 11, todo: 11, callout: 11, toggle: 11 };
+const blockDefaultPt = (t: string) => BLOCK_DEFAULT_PT[t] || 11;
+const FONT_SIZABLE = ["paragraph", "h1", "h2", "h3", "bullet", "numbered", "quote"];
+
 const SLASH_ITEMS = [
   { type: "newpage", label: "Nova página", desc: "Criar uma subpágina e linká-la aqui", display: "📄", style: "", kw: "pagina nova subpagina criar pagelink" },
   { type: "pagelink", label: "Link de página", desc: "Citar e linkar uma página existente", display: "🔗", style: "", kw: "link pagina citar referencia mencao" },
@@ -10658,6 +10663,20 @@ function BlocksEditor({ blocks, onChange, canEdit, files, pages, onSelectPage, o
                 <>
                   <div className="fixed inset-0 z-40" onPointerDown={() => setMenuForId(null)} />
                   <div className="bg-card absolute left-0 top-7 z-50 rounded-xl border border-border shadow-2xl p-1 w-44" style={{ backgroundColor: "hsl(var(--card))" }}>
+                    {FONT_SIZABLE.indexOf(block.type) !== -1 && (
+                      <>
+                        <div className="px-1.5 pt-1 pb-1.5">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 font-semibold mb-1 px-0.5">Tamanho da fonte</div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => updateBlock(block.id, { fontSize: Math.max(8, (block.fontSize || blockDefaultPt(block.type)) - 1) })} className="h-7 w-7 flex items-center justify-center rounded-md border border-border hover:bg-accent text-foreground text-base leading-none" title="Diminuir" type="button">−</button>
+                            <span className="flex-1 text-center text-xs font-semibold tabular-nums text-foreground">{(block.fontSize || blockDefaultPt(block.type))} pt</span>
+                            <button onClick={() => updateBlock(block.id, { fontSize: Math.min(120, (block.fontSize || blockDefaultPt(block.type)) + 1) })} className="h-7 w-7 flex items-center justify-center rounded-md border border-border hover:bg-accent text-foreground text-base leading-none" title="Aumentar" type="button">+</button>
+                            {block.fontSize ? <button onClick={() => updateBlock(block.id, { fontSize: null })} className="h-7 px-1.5 rounded-md hover:bg-accent text-[11px] text-muted-foreground" title="Voltar ao padrão" type="button">↺</button> : null}
+                          </div>
+                        </div>
+                        <div className="h-px bg-border my-1" />
+                      </>
+                    )}
                     {!nested && <button onClick={() => { setSelMode(true); setSelIds([block.id]); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>☑️</span>Selecionar blocos</button>}
                     <button onClick={() => { moveBlockUp(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>↑</span>Mover para cima</button>
                     <button onClick={() => { moveBlockDown(block.id); setMenuForId(null); }} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-medium text-foreground flex items-center gap-2" type="button"><span>↓</span>Mover para baixo</button>
@@ -11445,7 +11464,7 @@ function TextBlock({ block, autoFocus, onAutoFocused, onUpdate, onSplit, onBacks
   const linkOnly = block.type === "paragraph" && isPageLinkOnlyHtml(block.html);
   const blockCls = linkOnly ? "text-[15px] leading-5 text-foreground py-0" : baseCls[block.type];
   const inner = (
-    <div key="ce" ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} className={"outline-none break-words " + blockCls + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
+    <div key="ce" ref={ref as any} contentEditable={canEdit} suppressContentEditableWarning onInput={onInput} onPaste={onPaste} onKeyDown={onKeyDown} onClick={onClick} data-placeholder={placeholders[block.type] || ""} style={block.fontSize ? { fontSize: block.fontSize + "pt", lineHeight: 1.4 } : undefined} className={"outline-none break-words " + blockCls + " empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none"} />
   );
 
   if (block.type === "bullet") return (<div key="li-bullet" className="flex items-start gap-2.5 group"><span className="shrink-0 rounded-full select-none" style={{ width: "6px", height: "6px", marginTop: "9px", backgroundColor: "hsl(var(--foreground))" }} /><div className="flex-1 min-w-0">{inner}</div></div>);
