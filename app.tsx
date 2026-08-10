@@ -9577,7 +9577,7 @@ function FormatToolbar() {
         const rect = r.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) { setPos(null); return; }
         const top = rect.top - 48 < 8 ? rect.bottom + 8 : rect.top - 48;
-        const left = Math.max(8, Math.min(rect.left + rect.width / 2 - 200, window.innerWidth - 408));
+        const left = Math.max(8, Math.min(rect.left + rect.width / 2 - 220, window.innerWidth - 456));
         setPos({ top, left });
       } catch (e) {
         setPos(null);
@@ -9665,7 +9665,51 @@ function FormatToolbar() {
     } catch (e) {}
   };
 
+  // Aplica um tamanho de fonte (em pontos) à seleção. Se a seleção já cobre
+  // por inteiro um span de tamanho, atualiza-o em vez de aninhar outro.
+  const applyFontSize = (pt: number, keepOpen?: boolean) => {
+    pt = Math.max(6, Math.min(300, Math.round(pt || 0)));
+    try {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+      const range = sel.getRangeAt(0);
+      const ca: any = range.commonAncestorContainer;
+      const host: any = ca && ca.nodeType === 1 ? ca : ca && ca.parentElement;
+      if (host && host.tagName === "SPAN" && host.style && host.style.fontSize && range.toString() === (host.textContent || "")) {
+        host.style.fontSize = pt + "pt";
+        host.style.lineHeight = "1.3";
+      } else {
+        const span = document.createElement("span");
+        span.style.fontSize = pt + "pt";
+        span.style.lineHeight = "1.3";
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        sel.removeAllRanges();
+        const nr = document.createRange();
+        nr.selectNodeContents(span);
+        sel.addRange(nr);
+      }
+      const c: any = sel.getRangeAt(0).commonAncestorContainer;
+      const el: any = c?.nodeType === 1 ? c : c?.parentElement;
+      const editable = el && el.closest && el.closest('[contenteditable="true"]');
+      if (editable) editable.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch (e) {}
+    if (!keepOpen) setPicker("");
+  };
+
   const btnCls = "h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent text-foreground transition-colors";
+  const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
+  const curPt = (() => {
+    try {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      let n: any = sel.getRangeAt(0).commonAncestorContainer;
+      if (n && n.nodeType === 3) n = n.parentElement;
+      if (!n || !n.closest || !n.closest('[contenteditable="true"]')) return null;
+      const px = parseFloat(getComputedStyle(n).fontSize);
+      return px ? Math.round((px * 72) / 96) : null;
+    } catch (e) { return null; }
+  })();
 
   return (
     <div style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 99999, backgroundColor: "hsl(var(--card))" }} className="rounded-xl border-2 border-border shadow-2xl flex items-center p-1 gap-0.5 animate-fade-in" onMouseDown={(e) => e.preventDefault()}>
@@ -9674,6 +9718,14 @@ function FormatToolbar() {
       <button onClick={() => exec("underline")} className={btnCls + " underline"} title="Sublinhado (Ctrl+U)" type="button">U</button>
       <button onClick={() => exec("strikeThrough")} className={btnCls + " line-through"} title="Tachado" type="button">S</button>
       <button onClick={wrapInlineCode} className={btnCls + " font-mono text-xs"} title="Código inline" type="button">{"{}"}</button>
+      <div className="w-px h-5 bg-border mx-0.5" />
+      <div className="flex items-center gap-0.5">
+        <button onClick={() => applyFontSize((curPt || 12) - 1, true)} className="h-8 w-6 flex items-center justify-center rounded-md hover:bg-accent text-foreground transition-colors text-base leading-none" title="Diminuir fonte" type="button">−</button>
+        <button onClick={() => setPicker(picker === "fontSize" ? "" : "fontSize")} className="h-8 min-w-[42px] px-1 flex items-center justify-center gap-0.5 rounded-md hover:bg-accent text-foreground transition-colors text-xs font-semibold tabular-nums" title="Tamanho da fonte (pt)" type="button">
+          {curPt || "–"}<span className="text-[9px] text-muted-foreground">pt</span>
+        </button>
+        <button onClick={() => applyFontSize((curPt || 12) + 1, true)} className="h-8 w-6 flex items-center justify-center rounded-md hover:bg-accent text-foreground transition-colors text-base leading-none" title="Aumentar fonte" type="button">+</button>
+      </div>
       <div className="w-px h-5 bg-border mx-0.5" />
       <button onClick={() => setPicker(picker === "textColor" ? "" : "textColor")} className={btnCls + " font-bold relative"} title="Cor do texto" type="button">
         A<span className="absolute bottom-1 left-1.5 right-1.5 h-0.5 bg-muted-foreground rounded" />
@@ -9684,6 +9736,17 @@ function FormatToolbar() {
       <div className="w-px h-5 bg-border mx-0.5" />
       <button onClick={() => { const url = prompt("URL do link:"); if (url) exec("createLink", url); }} className={btnCls} title="Link" type="button">🔗</button>
       <button onClick={() => exec("removeFormat")} className={btnCls} title="Limpar formatação" type="button">✖</button>
+
+      {picker === "fontSize" && (
+        <div className="bg-card absolute top-full left-0 mt-2 rounded-xl border-2 border-border shadow-2xl p-2 w-44 z-[99999]" style={{ backgroundColor: "hsl(var(--card))" }}>
+          <div className="text-[11px] text-muted-foreground mb-1.5 font-medium">Tamanho da fonte (pt)</div>
+          <div className="grid grid-cols-4 gap-1 max-h-44 overflow-y-auto">
+            {FONT_SIZES.map((sz) => (
+              <button key={sz} onClick={() => applyFontSize(sz)} className={"h-7 rounded-md border border-border text-xs font-semibold tabular-nums transition-colors " + (curPt === sz ? "bg-primary text-primary-foreground border-primary" : "text-foreground hover:bg-accent")} type="button">{sz}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {picker === "textColor" && (
         <div className="bg-card absolute top-full left-0 mt-2 rounded-xl border-2 border-border shadow-2xl p-2 w-56 z-[99999]" style={{ backgroundColor: "hsl(var(--card))" }}>
