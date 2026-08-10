@@ -6399,23 +6399,50 @@ function DiagramEditor({ page, canEdit, onUpdate, headerLeft, headerRight, showI
   }, []);
 
   // Colar imagem (Ctrl/Cmd+V) de uma fonte externa direto no diagrama.
+  // Cobre 3 casos: (1) bitmap no clipboard (print/"Copiar imagem"),
+  // (2) HTML com <img src=...> (imagem copiada de um site),
+  // (3) texto que é um link de imagem ou data URI.
   useEffect(() => {
     const onPaste = async (e: any) => {
       const t: any = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (embedHeight && (!wrapRef.current || !wrapRef.current.contains(document.activeElement))) return;
       if (!canEdit) return;
-      const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) as any[] : [];
+      const cd = e.clipboardData;
+      if (!cd) return;
+      const items = cd.items ? Array.from(cd.items) as any[] : [];
+      // (1) Bitmap direto no clipboard
       const imgItem = items.find((it: any) => it.type && it.type.indexOf("image/") === 0);
-      if (!imgItem) return;
+      if (imgItem) {
+        e.preventDefault();
+        const file = imgItem.getAsFile(); if (!file) return;
+        try {
+          const src = await readFileAsDataURL(file);
+          const dim = await imageDims(src);
+          addImageNodes([{ src, iw: dim.w, ih: dim.h }]);
+          toast("Imagem colada no diagrama", "success");
+        } catch (err) { toast("Não consegui colar a imagem", "error"); }
+        return;
+      }
+      // (2)/(3) Imagem por URL (copiada de um site)
+      const html = cd.getData ? cd.getData("text/html") : "";
+      const text = cd.getData ? cd.getData("text/plain") : "";
+      let url = "";
+      if (html) { const m = html.match(/<img[^>]+src=["']([^"']+)["']/i); if (m) url = m[1]; }
+      if (!url && text) {
+        const tt = text.trim();
+        if (/^data:image\//i.test(tt) || /^https?:\/\/\S+\.(png|jpe?g|gif|webp|bmp|svg)(\?\S*)?$/i.test(tt)) url = tt;
+      }
+      if (!url) return;
       e.preventDefault();
-      const file = imgItem.getAsFile(); if (!file) return;
       try {
-        const src = await readFileAsDataURL(file);
-        const dim = await imageDims(src);
-        addImageNodes([{ src, iw: dim.w, ih: dim.h }]);
+        const dim = await imageDims(url);
+        const inlined = await srcToDataUrl(url); // tenta embutir p/ exibir e exportar bem
+        addImageNodes([{ src: inlined || url, iw: dim.w, ih: dim.h }]);
         toast("Imagem colada no diagrama", "success");
-      } catch (err) { toast("Não consegui colar a imagem", "error"); }
+      } catch (err) {
+        toast("Não consegui carregar essa imagem (o site pode bloquear).", "error");
+      }
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
